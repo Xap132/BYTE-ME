@@ -1,5 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DEFAULT_SETTINGS } from '@/constants/voices';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const PREFERENCES_KEY = '@tts_user_preferences';
 const AUDIO_METADATA_KEY = '@tts_audio_metadata';

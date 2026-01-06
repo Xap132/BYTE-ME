@@ -1,10 +1,9 @@
-import React from 'react';
-import { StyleSheet, View, TouchableOpacity, Alert } from 'react-native';
-import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
 import { LucideIcon } from '@/components/ui/lucide-icon';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import * as Haptics from 'expo-haptics';
+import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 export function AudioListItem({
   audioFile,

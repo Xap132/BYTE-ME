@@ -1,9 +1,8 @@
-import React from 'react';
-import { View, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { LucideIcon } from '@/components/ui/lucide-icon';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import * as Haptics from 'expo-haptics';
+import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 /**
  * Audio player controls with play/pause, skip forward/backward

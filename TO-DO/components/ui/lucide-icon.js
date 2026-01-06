@@ -1,6 +1,5 @@
-import React from 'react';
-import * as LucideIcons from 'lucide-react-native';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import * as LucideIcons from 'lucide-react-native';
 
 /**
  * Themed Lucide icon component that adapts to light/dark mode

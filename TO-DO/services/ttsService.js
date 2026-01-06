@@ -1,5 +1,5 @@
+import { LANGUAGE_CODES } from '@/constants/voices';
 import * as Speech from 'expo-speech';
-import { LANGUAGE_CODES, getVoice } from '@/constants/voices';
 
 class TTSService {
   constructor() {

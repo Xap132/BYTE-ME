@@ -1,9 +1,8 @@
-import React from 'react';
-import { StyleSheet, View } from 'react-native';
-import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
 import { LucideIcon } from '@/components/ui/lucide-icon';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import { StyleSheet, View } from 'react-native';
 
 export function EmptyState({
   title = 'No Audio Files',

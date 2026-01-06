@@ -1,11 +1,10 @@
-import React from 'react';
-import { StyleSheet, View } from 'react-native';
-import Slider from '@react-native-community/slider';
-import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
 import { LucideIcon } from '@/components/ui/lucide-icon';
-import { useThemeColor } from '@/hooks/use-theme-color';
 import { DEFAULT_SETTINGS } from '@/constants/voices';
+import { useThemeColor } from '@/hooks/use-theme-color';
+import Slider from '@react-native-community/slider';
+import { StyleSheet, View } from 'react-native';
 
 export function SpeedControl({ value, onChange }) {
   const tintColor = useThemeColor({}, 'tint');

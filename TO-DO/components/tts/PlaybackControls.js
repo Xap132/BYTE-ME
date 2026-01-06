@@ -1,10 +1,9 @@
-import React from 'react';
-import { StyleSheet, View, TouchableOpacity, ActivityIndicator } from 'react-native';
-import * as Haptics from 'expo-haptics';
-import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
 import { LucideIcon } from '@/components/ui/lucide-icon';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import * as Haptics from 'expo-haptics';
+import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 export function PlaybackControls({
   isPlaying,

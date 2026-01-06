@@ -1,9 +1,8 @@
-import React from 'react';
-import { StyleSheet, View, ScrollView } from 'react-native';
-import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
 import { LucideIcon } from '@/components/ui/lucide-icon';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 export default function SettingsScreen() {
   const borderColor = useThemeColor({ light: '#E5E7EB', dark: '#374151' }, 'icon');

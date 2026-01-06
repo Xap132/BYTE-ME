@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, ScrollView, Alert, Platform } from 'react-native';
-import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { PitchControl } from '@/components/tts/PitchControl';
+import { PlaybackControls } from '@/components/tts/PlaybackControls';
+import { SpeedControl } from '@/components/tts/SpeedControl';
 import { TextInputArea } from '@/components/tts/TextInputArea';
 import { VoiceSelector } from '@/components/tts/VoiceSelector';
-import { PitchControl } from '@/components/tts/PitchControl';
-import { SpeedControl } from '@/components/tts/SpeedControl';
-import { PlaybackControls } from '@/components/tts/PlaybackControls';
-import { ttsService } from '@/services/ttsService';
+import { DEFAULT_SETTINGS } from '@/constants/voices';
 import { audioManager } from '@/services/audioManager';
 import { storageService } from '@/services/storageService';
-import { DEFAULT_SETTINGS } from '@/constants/voices';
+import { ttsService } from '@/services/ttsService';
+import { useEffect, useState } from 'react';
+import { Alert, ScrollView, StyleSheet } from 'react-native';
 
 export default function TTSScreen() {
   const [text, setText] = useState('');
