@@ -3,7 +3,9 @@ import { audioManager } from '@/services/audioManager';
 import { storageService } from '@/services/storageService';
 import { ttsService } from '@/services/ttsService';
 import Slider from '@react-native-community/slider';
-import { Check, ChevronDown, Pause, Play, RotateCcw, Save, Square } from 'lucide-react-native';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import { Check, ChevronDown, Download, Pause, Play, Save, Square } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -32,6 +34,7 @@ export default function TTSScreen() {
   // Playback state
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [isAudioReady, setIsAudioReady] = useState(false);
   const [currentWordIndex, setCurrentWordIndex] = useState(-1);
   const [progress, setProgress] = useState(0);
   
@@ -81,6 +84,62 @@ export default function TTSScreen() {
       if (prefs.defaultSpeed) setSpeed(prefs.defaultSpeed);
     } catch (error) {
       console.error('Error loading preferences:', error);
+    }
+  };
+
+  const handleImportFile = async () => {
+    try {
+      // Allow multiple file types: TXT (full support), DOCX/PDF (development build required)
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'text/plain', // Only TXT files for now in Expo Go
+      });
+      
+      if (result.canceled) return;
+      
+      if (result.assets && result.assets.length > 0) {
+        const file = result.assets[0];
+        const fileName = file.name || '';
+        const fileExtension = fileName.split('.').pop().toLowerCase();
+        
+        console.log('Selected file:', fileName, 'Type:', fileExtension);
+        
+        let content = '';
+        
+        if (fileExtension === 'txt') {
+          // Read TXT file directly - with web platform check
+          if (Platform.OS === 'web') {
+            // Web platform - use different approach
+            const response = await fetch(file.uri);
+            content = await response.text();
+          } else {
+            // Mobile platform - use file system
+            content = await FileSystem.readAsStringAsync(file.uri, { encoding: 'utf8' });
+          }
+        } else if (fileExtension === 'pdf') {
+          Alert.alert('PDF Support', 'PDF extraction requires a development build. Please use TXT or DOCX files for now.');
+          return;
+        } else if (fileExtension === 'docx') {
+          // DOCX support requires development build
+          Alert.alert(
+            'DOCX Support', 
+            'DOCX files require a development build with native dependencies. Please:\n\n1. Convert your DOCX to TXT first, or\n2. Copy and paste the text directly\n\nSupported formats: TXT, PDF (dev build)'
+          );
+          return;
+        } else {
+          Alert.alert('Unsupported Format', `${fileExtension.toUpperCase()} not supported. Use TXT, DOCX, or PDF.`);
+          return;
+        }
+        
+        if (content.trim()) {
+          setText(content);
+          Alert.alert('Success', `Imported: ${fileName}`);
+        } else {
+          Alert.alert('Warning', 'File is empty or couldn\'t extract text.');
+        }
+      }
+    } catch (error) {
+      console.error('Error importing file:', error);
+      Alert.alert('Error', 'Failed to import file. Please select a .txt file.');
     }
   };
 
@@ -151,6 +210,7 @@ export default function TTSScreen() {
     stopSentenceHighlighting();
     setIsPlaying(false);
     setIsPaused(false);
+    setIsAudioReady(false); // Close player when audio completes
   };
 
   const handlePlay = async () => {
@@ -166,16 +226,28 @@ export default function TTSScreen() {
       setIsPlaying(true);
       setIsPaused(false);
       pausedTimeRef.current = 0;
-      startSentenceHighlighting(0, 0);
+      setIsAudioReady(false); // Don't show UI until audio starts
+      
+      // Set callback for when audio actually starts
+      ttsService.setOnStartCallback(() => {
+        console.log('[TTS] Audio started, showing player');
+        setIsAudioReady(true);
+        startSentenceHighlighting(0, 0);
+      });
+      
+      // Set callback for when audio finishes
+      ttsService.setOnDoneCallback(() => {
+        console.log('[TTS] Audio finished');
+        handlePlaybackComplete();
+      });
       
       await ttsService.speak({ text, language, pitch, speed });
-      
-      // Speech finished naturally
-      handlePlaybackComplete();
     } catch (error) {
       console.error('TTS Error:', error);
       Alert.alert('Error', 'Failed to speak text');
-      handlePlaybackComplete();
+      setIsPlaying(false);
+      setIsPaused(false);
+      setIsAudioReady(false);
     } finally {
       setIsLoading(false);
     }
@@ -203,7 +275,10 @@ export default function TTSScreen() {
 
   const handleStop = async () => {
     await ttsService.stop();
-    handlePlaybackComplete();
+    stopSentenceHighlighting();
+    setIsPlaying(false);
+    setIsPaused(false);
+    setIsAudioReady(false); // Close player when stop is pressed
   };
 
   const handleRestart = async () => {
@@ -318,6 +393,10 @@ export default function TTSScreen() {
             <View style={styles.inputFooter}>
               <Text style={styles.charCount}>{text.length} characters</Text>
               <Text style={styles.duration}>{estimateDuration()}</Text>
+              <TouchableOpacity style={styles.importBtn} onPress={handleImportFile}>
+                <Download size={14} color="#6B7280" />
+                <Text style={styles.importBtnText}>Import</Text>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -394,8 +473,8 @@ export default function TTSScreen() {
           </View>
         </ScrollView>
 
-        {/* Sticky Playback Controls - Redesigned */}
-        {(isPlaying || isPaused) && (
+        {/* Sticky Playback Controls - Only show after audio is ready */}
+        {isAudioReady && (
           <View style={[styles.stickyPlayer, { paddingBottom: insets.bottom + 70 }]}>
             <View style={styles.playerHeader}>
               <View style={styles.playerInfo}>
@@ -410,11 +489,6 @@ export default function TTSScreen() {
             
             {/* Control Buttons Row */}
             <View style={styles.playerControls}>
-              {/* Restart */}
-              <TouchableOpacity style={styles.playerBtn} onPress={handleRestart}>
-                <RotateCcw size={20} color="#6B7280" />
-              </TouchableOpacity>
-              
               {/* Play/Pause Main Button */}
               <TouchableOpacity style={styles.playerMainBtn} onPress={handlePause}>
                 {isPaused ? (
@@ -591,6 +665,19 @@ const styles = StyleSheet.create({
   duration: {
     fontSize: 13,
     fontFamily: 'SF-Pro-Regular',
+    color: '#6B7280',
+  },
+  importBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 6,
+    borderRadius: 6,
+    backgroundColor: 'transparent',
+    gap: 4,
+  },
+  importBtnText: {
+    fontSize: 13,
+    fontFamily: 'SF-Pro-Medium',
     color: '#6B7280',
   },
   section: {

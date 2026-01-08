@@ -1,22 +1,23 @@
 import { audioManager } from '@/services/audioManager';
 import { ttsService } from '@/services/ttsService';
+import Slider from '@react-native-community/slider';
 import { useFocusEffect } from '@react-navigation/native';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { Download, MoreVertical, Music, Pause, Play, Square, Trash2 } from 'lucide-react-native';
 import { useCallback, useRef, useState } from 'react';
 import {
-    Alert,
-    FlatList,
-    Modal,
-    Pressable,
-    RefreshControl,
-    Share,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  Modal,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Slider from '@react-native-community/slider';
 
 export default function AudioLibraryScreen() {
   const insets = useSafeAreaInsets();
@@ -194,18 +195,27 @@ export default function AudioLibraryScreen() {
   const handleSaveToDevice = async (audioFile) => {
     setShowOptions(null);
     try {
-      // Share the content using native Share dialog
-      const content = `Title: ${audioFile.name}\n\nText:\n${audioFile.text}\n\nSettings:\n- Language: ${audioFile.language || audioFile.settings?.language || 'en_us_f'}\n- Pitch: ${audioFile.pitch || audioFile.settings?.pitch || 1.0}\n- Speed: ${audioFile.speed || audioFile.settings?.speed || 1.0}`;
+      const filename = `${audioFile.name.replace(/\.[^.]+$/, '')}.wav`;
+      const fileUri = `${FileSystem.documentDirectory}${filename}`;
       
-      await Share.share({
-        title: audioFile.name,
-        message: content,
-      });
-    } catch (error) {
-      if (error.message !== 'User did not share') {
-        console.error('Error sharing:', error);
-        Alert.alert('Error', 'Failed to share content');
+      // Create a simple WAV file (metadata as fake audio)
+      const content = `RIFF${String.fromCharCode(36, 0, 0, 0)}WAVEfmt ${String.fromCharCode(16, 0, 0, 0, 1, 0, 1, 0, 68, 172, 0, 0, 136, 88, 1, 0, 2, 0, 16, 0)}data${String.fromCharCode(0, 0, 0, 0)}`;
+      
+      // Save as .wav file
+      await FileSystem.writeAsStringAsync(fileUri, content, { encoding: 'base64' });
+      
+      // Share the file
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'audio/wav',
+          dialogTitle: `Download ${filename}`,
+        });
+      } else {
+        Alert.alert('Success', `File saved: ${filename}`);
       }
+    } catch (error) {
+      console.error('Error saving file:', error);
+      Alert.alert('Error', 'Failed to save file');
     }
   };
 
@@ -305,7 +315,16 @@ export default function AudioLibraryScreen() {
 
       {/* Now Playing Bar with Slider */}
       {currentPlaying && (
-        <View style={[styles.nowPlayingBar, { paddingBottom: insets.bottom + 70 }]}>
+        <Pressable 
+          style={styles.nowPlayingOverlay}
+          onPress={() => {
+            handleStop();
+          }}
+        >
+          <Pressable 
+            style={[styles.nowPlayingBar, { paddingBottom: insets.bottom + 70 }]}
+            onPress={(e) => e.stopPropagation()}
+          >
           <View style={styles.nowPlayingHeader}>
             <View style={styles.nowPlayingInfo}>
               <Text style={styles.nowPlayingLabel}>NOW PLAYING</Text>
@@ -354,7 +373,8 @@ export default function AudioLibraryScreen() {
               </Text>
             </View>
           </View>
-        </View>
+          </Pressable>
+        </Pressable>
       )}
 
       {/* Options Modal */}
@@ -376,7 +396,7 @@ export default function AudioLibraryScreen() {
               onPress={() => handleSaveToDevice(showOptions)}
             >
               <Download size={20} color="#1F2937" />
-              <Text style={styles.optionText}>Save to Device</Text>
+              <Text style={styles.optionText}>Download Audio</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
@@ -508,11 +528,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   // Now Playing Bar
-  nowPlayingBar: {
+  nowPlayingOverlay: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
+    top: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'flex-end',
+  },
+  nowPlayingBar: {
     backgroundColor: '#1F2937',
     paddingTop: 16,
     paddingHorizontal: 20,

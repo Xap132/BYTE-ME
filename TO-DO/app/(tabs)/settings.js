@@ -19,8 +19,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
-  const [autoPlay, setAutoPlay] = useState(false);
-  const [notifications, setNotifications] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
   
   // Voice browser state
@@ -42,8 +40,6 @@ export default function SettingsScreen() {
   const loadSettings = async () => {
     try {
       const prefs = await storageService.loadPreferences();
-      if (prefs.autoPlay !== undefined) setAutoPlay(prefs.autoPlay);
-      if (prefs.notifications !== undefined) setNotifications(prefs.notifications);
       if (prefs.darkMode !== undefined) setDarkMode(prefs.darkMode);
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -58,28 +54,6 @@ export default function SettingsScreen() {
     } catch (error) {
       console.error('Error saving setting:', error);
     }
-  };
-
-  const handleClearLibrary = () => {
-    Alert.alert(
-      'Clear Library',
-      'Are you sure you want to delete all saved audio files? This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Clear All',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await audioManager.clearAllAudioFiles();
-              Alert.alert('Done', 'Library cleared successfully');
-            } catch (error) {
-              Alert.alert('Error', 'Failed to clear library');
-            }
-          },
-        },
-      ]
-    );
   };
 
   const handleOpenVoiceBrowser = async () => {
@@ -221,36 +195,6 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <View style={styles.settingItem}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingTitle}>Auto-play</Text>
-              <Text style={styles.settingDesc}>Play audio automatically after saving</Text>
-            </View>
-            <Switch
-              value={autoPlay}
-              onValueChange={(val) => handleToggle('autoPlay', val, setAutoPlay)}
-              trackColor={{ false: '#E5E7EB', true: '#93C5FD' }}
-              thumbColor={autoPlay ? '#2563EB' : '#FFFFFF'}
-            />
-          </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.settingItem}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingTitle}>Notifications</Text>
-              <Text style={styles.settingDesc}>Get notified when audio is ready</Text>
-            </View>
-            <Switch
-              value={notifications}
-              onValueChange={(val) => handleToggle('notifications', val, setNotifications)}
-              trackColor={{ false: '#E5E7EB', true: '#93C5FD' }}
-              thumbColor={notifications ? '#2563EB' : '#FFFFFF'}
-            />
-          </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.settingItem}>
-            <View style={styles.settingInfo}>
               <Text style={styles.settingTitle}>Dark Mode</Text>
               <Text style={styles.settingDesc}>Enable dark theme</Text>
             </View>
@@ -261,41 +205,34 @@ export default function SettingsScreen() {
               thumbColor={darkMode ? '#2563EB' : '#FFFFFF'}
             />
           </View>
-        </View>
 
-        {/* Storage Section */}
-        <Text style={styles.sectionLabel}>STORAGE</Text>
-        <View style={styles.section}>
-          <TouchableOpacity style={styles.actionItem} onPress={handleClearLibrary}>
-            <View style={styles.actionLeft}>
-              <View style={styles.actionIconContainer}>
-                <Trash2 size={18} color="#DC2626" />
-              </View>
-              <View style={styles.settingInfo}>
-                <Text style={[styles.settingTitle, styles.dangerText]}>Clear Library</Text>
-                <Text style={styles.settingDesc}>Delete all saved audio files</Text>
-              </View>
-            </View>
-            <ChevronRight size={20} color="#9CA3AF" />
-          </TouchableOpacity>
-        </View>
+          <View style={styles.divider} />
 
-        {/* Voice Section */}
-        <Text style={styles.sectionLabel}>TEXT-TO-SPEECH</Text>
-        <View style={styles.section}>
           <TouchableOpacity style={styles.actionItem} onPress={handleOpenVoiceBrowser}>
             <View style={styles.actionLeft}>
               <View style={[styles.actionIconContainer, { backgroundColor: '#DBEAFE' }]}>
                 <Volume2 size={18} color="#2563EB" />
               </View>
               <View style={styles.settingInfo}>
-                <Text style={styles.settingTitle}>Installed Voices</Text>
-                <Text style={styles.settingDesc}>View and test TTS voices on your device</Text>
+                <Text style={styles.settingTitle}>Voice Library</Text>
+                <Text style={styles.settingDesc}>Browse available TTS voices</Text>
               </View>
             </View>
             <ChevronRight size={20} color="#9CA3AF" />
           </TouchableOpacity>
         </View>
+
+        {/* TTS Info Section */}
+        <Text style={styles.sectionLabel}>TEXT-TO-SPEECH INFO</Text>
+        <View style={styles.section}>
+          <View style={styles.infoItem}>
+            <Text style={styles.infoText}>
+              Available voices and languages depend on your device's installed TTS engines. Different devices may have different voice options.
+            </Text>
+          </View>
+        </View>
+
+
 
         {/* About Section */}
         <Text style={styles.sectionLabel}>ABOUT</Text>
@@ -307,12 +244,14 @@ export default function SettingsScreen() {
           <View style={styles.divider} />
           <View style={styles.aboutItem}>
             <Text style={styles.aboutLabel}>Developer</Text>
-            <Text style={styles.aboutValue}>BYTE-ME Team</Text>
+
+            <Text style={styles.aboutValue}>BYTE-ME GROUP</Text>
           </View>
         </View>
 
         {/* Footer */}
-        <Text style={styles.footer}>Made with ❤️ by BYTE-ME</Text>
+        <Text style={styles.footer}>BSCS 3-1 for DCIT 26 - BYTE-ME</Text>
+          <Text style={styles.footer}>MARVELOUS GONZALES{"\n"}LYZETTE DOMINUGES{"\n"}HONEY GRAVE AQUINO</Text>
       </ScrollView>
 
       {/* Voice Browser Modal */}
@@ -324,7 +263,7 @@ export default function SettingsScreen() {
       >
         <View style={[styles.modalContainer, { paddingTop: insets.top }]}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Installed Voices</Text>
+            <Text style={styles.modalTitle}>Voice Library</Text>
             <TouchableOpacity 
               style={styles.closeButton}
               onPress={() => setShowVoiceModal(false)}
@@ -630,5 +569,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#EFF6FF',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  infoItem: {
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  infoText: {
+    fontSize: 14,
+    fontFamily: 'SF-Pro-Regular',
+    color: '#6B7280',
+    lineHeight: 20,
   },
 });

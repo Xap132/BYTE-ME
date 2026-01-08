@@ -1,6 +1,3 @@
-import * as Speech from 'expo-speech';
-import { storageService } from './storageService';
-
 /**
  * TTS Service with User Voice Selection
  * 
@@ -11,6 +8,9 @@ import { storageService } from './storageService';
  * 
  * Users can select their preferred voice for each language in Settings.
  */
+
+import * as Speech from 'expo-speech';
+import { storageService } from './storageService';
 
 const LANG_CONFIG = {
   en_us_f: { lang: 'en-US', prefKey: 'voiceUS' },
@@ -25,6 +25,9 @@ const LANG_CONFIG = {
 // Priority languages (always show first if available)
 const PRIORITY_LANGUAGES = ['en-US', 'en-GB', 'fil-PH', 'fil', 'tl-PH', 'tl'];
 
+// Blacklist of languages to exclude from available voices
+const BLACKLISTED_LANGUAGES = ['en-IN'];
+
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
@@ -34,7 +37,6 @@ const LANGUAGE_DISPLAY_NAMES = {
   'en-US': 'English (US)',
   'en-GB': 'English (UK)',
   'en-AU': 'English (Australia)',
-  'en-IN': 'English (India)',
   'en-ZA': 'English (South Africa)',
   'en-IE': 'English (Ireland)',
   'en-CA': 'English (Canada)',
@@ -129,7 +131,6 @@ const LANGUAGE_FLAGS = {
   'en-US': '🇺🇸',
   'en-GB': '🇬🇧',
   'en-AU': '🇦🇺',
-  'en-IN': '🇮🇳',
   'en-ZA': '🇿🇦',
   'en-IE': '🇮🇪',
   'en-CA': '🇨🇦',
@@ -350,6 +351,18 @@ class TTSService {
     this.currentSettings = null;
     this.cachedVoices = null;
     this.wordUpdateCallback = null; // Callback for word updates
+    this.onStartCallback = null; // Callback when audio starts
+    this.onDoneCallback = null; // Callback when audio finishes
+  }
+
+  // Set callback for when audio starts
+  setOnStartCallback(callback) {
+    this.onStartCallback = callback;
+  }
+
+  // Set callback for when audio finishes
+  setOnDoneCallback(callback) {
+    this.onDoneCallback = callback;
   }
 
   // Set callback for word highlighting
@@ -375,13 +388,19 @@ class TTSService {
       const prefs = await storageService.loadPreferences();
       const userVoice = prefs[prefKey];
       
-      if (userVoice) {
-        console.log(`[TTS] Using user-selected voice: ${userVoice} for ${langCode}`);
-        return userVoice;
-      }
-      
-      // Get all available voices
+      // Get all available voices first
       const voices = await Speech.getAvailableVoicesAsync();
+      
+      // If user has a saved voice, validate it exists in available voices
+      if (userVoice) {
+        const voiceExists = voices.some(v => v.identifier === userVoice);
+        if (voiceExists) {
+          console.log(`[TTS] Using user-selected voice: ${userVoice} for ${langCode}`);
+          return userVoice;
+        } else {
+          console.log(`[TTS] User voice ${userVoice} not found, finding default`);
+        }
+      }
       
       // Find voices matching this language
       // Try exact match first, then base language match
@@ -402,10 +421,9 @@ class TTSService {
       
       // Return first voice's identifier (Voice A) or null
       const firstVoice = matchingVoices[0];
-      if (firstVoice) {
-        const voiceId = firstVoice.identifier || null;
-        console.log(`[TTS] Using default Voice A: ${voiceId} (${firstVoice.name}) for ${langCode}`);
-        return voiceId;
+      if (firstVoice && firstVoice.identifier) {
+        console.log(`[TTS] Using default Voice A: ${firstVoice.identifier} for ${langCode}`);
+        return firstVoice.identifier;
       }
       
       // No voice found for this language - let system use default
@@ -455,26 +473,43 @@ class TTSService {
     }
     
     // Get user's selected voice or auto-detect
-    const voiceId = await this._getVoiceForLanguage(langCode, prefKey);
+    let voiceId = await this._getVoiceForLanguage(langCode, prefKey);
+    
+    // VALIDATE voice ID - if it looks invalid, set to null to use system default
+    if (voiceId && typeof voiceId === 'string') {
+      // Check if it looks like a constructed string like "en-IN-language" (invalid)
+      if (voiceId.includes('-language') || voiceId.includes('-voice') || !voiceId.includes('-')) {
+        console.warn(`[TTS] Invalid voice ID detected: ${voiceId}, using system default`);
+        voiceId = null;
+      }
+    }
     
     const finalPitch = clamp(Number(pitch) || 1.0, 0.5, 2.0);
     const finalRate = clamp(Number(speed) || 1.0, 0.5, 2.0);
 
-    console.log(`[TTS] Speaking: lang=${langCode}, voice=${voiceId}, pitch=${finalPitch}, rate=${finalRate}`);
+    console.log(`[TTS] Speaking: lang=${langCode}, voice=${voiceId || 'system-default'}, pitch=${finalPitch}, rate=${finalRate}`);
 
     return new Promise((resolve, reject) => {
       Speech.speak(text, {
         language: langCode,
-        voice: voiceId,
+        voice: voiceId || undefined, // Use undefined if null, not empty string
         pitch: finalPitch,
         rate: finalRate,
         onStart: () => {
           this.isSpeaking = true;
           this.isPaused = false;
+          // Call the onStart callback to show UI
+          if (this.onStartCallback) {
+            this.onStartCallback();
+          }
         },
         onDone: () => {
           this.isSpeaking = false;
           this.isPaused = false;
+          // Call the onDone callback to handle completion
+          if (this.onDoneCallback) {
+            this.onDoneCallback();
+          }
           resolve();
         },
         onStopped: () => {
@@ -572,10 +607,13 @@ class TTSService {
     try {
       const voices = await Speech.getAvailableVoicesAsync();
       
+      // Filter out blacklisted languages
+      const filteredVoices = voices.filter(voice => !BLACKLISTED_LANGUAGES.includes(voice.language));
+      
       // Group voices by language
       const languageGroups = {};
       
-      voices.forEach((voice, index) => {
+      filteredVoices.forEach((voice, index) => {
         const lang = voice.language || 'unknown';
         const id = voice.identifier || `voice_${index}`;
         

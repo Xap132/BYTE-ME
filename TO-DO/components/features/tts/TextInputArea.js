@@ -2,7 +2,7 @@ import Button from '@/components/ui/base/Button';
 import Card from '@/components/ui/base/Card';
 import Input from '@/components/ui/base/Input';
 import React from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 /**
  * TextInput Feature Component with Word Highlighting
