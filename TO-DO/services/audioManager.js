@@ -10,32 +10,32 @@ class AudioManager {
   constructor() {
     this.sound = null;
     this.recording = null;
-    this.initializeAudioDirectory();
+    this.initialized = false;
+    // Don't call async in constructor
   }
 
   /**
-   * Initialize audio directory
+   * Initialize audio directory (call this before using)
    */
   async initializeAudioDirectory() {
+    if (this.initialized) return;
+    
     // Skip file system on web
     if (Platform.OS === 'web') {
       console.log('Running on web - file system disabled');
       AUDIO_DIR = 'tts_audio/';
+      this.initialized = true;
       return;
     }
     
     try {
-      // Try to get documentDirectory, fallback to cacheDirectory
-      let baseDir;
-      try {
-        baseDir = FileSystem.documentDirectory;
-      } catch {
-        baseDir = FileSystem.cacheDirectory;
-      }
+      // Use FileSystem directly - it's available on mobile
+      const baseDir = FileSystem.documentDirectory;
       
       if (!baseDir) {
-        console.error('FileSystem directory not available');
-        AUDIO_DIR = 'tts_audio/'; // Fallback
+        console.warn('FileSystem directory not available, using fallback');
+        AUDIO_DIR = 'tts_audio/';
+        this.initialized = true;
         return;
       }
       
@@ -45,9 +45,13 @@ class AudioManager {
       if (!dirInfo.exists) {
         await FileSystem.makeDirectoryAsync(AUDIO_DIR, { intermediates: true });
       }
+      
+      console.log('Audio directory initialized:', AUDIO_DIR);
+      this.initialized = true;
     } catch (error) {
-      console.error('Error initializing audio directory:', error);
+      console.warn('Error initializing audio directory:', error);
       AUDIO_DIR = 'tts_audio/'; // Fallback
+      this.initialized = true;
     }
   }
 
@@ -55,6 +59,9 @@ class AudioManager {
    * Save TTS settings and text for later replay
    */
   async saveAudioFile(text, options, format = 'wav') {
+    // Make sure directory is initialized
+    await this.initializeAudioDirectory();
+    
     try {
       const timestamp = Date.now();
       const filename = `tts_${timestamp}.${format}`;
@@ -100,9 +107,7 @@ class AudioManager {
     }
   }
 
-  /**
-   * Get all saved audio files
-   */
+  // Get all saved audio files
   async getAllAudioFiles() {
     try {
       const metadata = await storageService.loadAudioMetadata();

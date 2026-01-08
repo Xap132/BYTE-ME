@@ -1,38 +1,52 @@
-import { HapticTab } from '@/components/haptic-tab';
-import { LucideIcon } from '@/components/ui/lucide-icon';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Tabs } from 'expo-router';
+import { Text, View } from 'react-native';
+
+function TabIcon({ icon, focused }) {
+  return (
+    <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ fontSize: 24 }}>{icon}</Text>
+    </View>
+  );
+}
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: '#6366F1',
+        tabBarInactiveTintColor: '#9CA3AF',
         headerShown: false,
-        tabBarButton: HapticTab,
+        tabBarStyle: {
+          backgroundColor: '#FFFFFF',
+          borderTopColor: '#E5E7EB',
+          height: 65,
+          paddingBottom: 10,
+          paddingTop: 10,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '600',
+        },
       }}>
       <Tabs.Screen
         name="index"
         options={{
           title: 'TTS',
-          tabBarIcon: ({ color }) => <LucideIcon name="Mic" size={28} color={color} />,
+          tabBarIcon: ({ focused }) => <TabIcon icon="🎙️" focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="explore"
         options={{
           title: 'Library',
-          tabBarIcon: ({ color }) => <LucideIcon name="Library" size={28} color={color} />,
+          tabBarIcon: ({ focused }) => <TabIcon icon="📚" focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
           title: 'Settings',
-          tabBarIcon: ({ color }) => <LucideIcon name="Settings" size={28} color={color} />,
+          tabBarIcon: ({ focused }) => <TabIcon icon="⚙️" focused={focused} />,
         }}
       />
     </Tabs>
