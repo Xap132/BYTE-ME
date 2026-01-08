@@ -10,16 +10,17 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Play, Pause, Music } from 'lucide-react-native';
 
 export default function AudioLibraryScreen() {
+  const insets = useSafeAreaInsets();
   const [audioFiles, setAudioFiles] = useState([]);
-  const [filteredFiles, setFilteredFiles] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const [playingId, setPlayingId] = useState(null);
+  const [currentPlaying, setCurrentPlaying] = useState(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -32,7 +33,6 @@ export default function AudioLibraryScreen() {
       const files = await audioManager.getAllAudioFiles();
       const sortedFiles = files.sort((a, b) => b.dateCreated - a.dateCreated);
       setAudioFiles(sortedFiles);
-      setFilteredFiles(sortedFiles);
     } catch (error) {
       console.error('Error loading audio files:', error);
     }
@@ -44,28 +44,16 @@ export default function AudioLibraryScreen() {
     setRefreshing(false);
   };
 
-  const handleSearch = (query) => {
-    setSearchQuery(query);
-    if (query.trim() === '') {
-      setFilteredFiles(audioFiles);
-    } else {
-      const filtered = audioFiles.filter(
-        (file) =>
-          file.name.toLowerCase().includes(query.toLowerCase()) ||
-          file.text?.toLowerCase().includes(query.toLowerCase())
-      );
-      setFilteredFiles(filtered);
-    }
-  };
-
   const handlePlay = async (audioFile) => {
     try {
       if (playingId === audioFile.id) {
         await ttsService.stop();
         setPlayingId(null);
+        setCurrentPlaying(null);
       } else {
         await ttsService.stop();
         setPlayingId(audioFile.id);
+        setCurrentPlaying(audioFile);
         await ttsService.speak({
           text: audioFile.text,
           language: audioFile.settings?.language || 'en',
@@ -74,10 +62,12 @@ export default function AudioLibraryScreen() {
           speed: audioFile.settings?.speed || 1.0,
         });
         setPlayingId(null);
+        setCurrentPlaying(null);
       }
     } catch (error) {
       console.error('Error playing audio:', error);
       setPlayingId(null);
+      setCurrentPlaying(null);
     }
   };
 
@@ -103,117 +93,104 @@ export default function AudioLibraryScreen() {
     );
   };
 
-  const formatDate = (timestamp) => {
-    const date = new Date(timestamp);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+  const formatDuration = (text) => {
+    const words = text?.trim().split(/\s+/).length || 0;
+    const seconds = Math.ceil((words / 150) * 60);
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const renderItem = ({ item }) => {
-    const lang = getLanguage(item.settings?.language);
     const isCurrentPlaying = playingId === item.id;
 
     return (
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle} numberOfLines={1}>
-            {item.name}
-          </Text>
-          <Pressable
-            style={styles.deleteBtn}
-            onPress={() => handleDelete(item)}
-          >
-            <Text style={styles.deleteBtnText}>🗑️</Text>
-          </Pressable>
+      <Pressable 
+        style={styles.listItem}
+        onPress={() => handlePlay(item)}
+        onLongPress={() => handleDelete(item)}
+      >
+        <View style={styles.itemLeft}>
+          <View style={[styles.playIcon, isCurrentPlaying && styles.playIconActive]}>
+            {isCurrentPlaying ? (
+              <Pause size={16} color="#FFFFFF" fill="#FFFFFF" />
+            ) : (
+              <Play size={16} color="#6B7280" fill="#6B7280" />
+            )}
+          </View>
+          <View style={styles.itemInfo}>
+            <Text style={styles.itemTitle} numberOfLines={1}>
+              {item.name}
+            </Text>
+            <Text style={styles.itemSubtitle} numberOfLines={1}>
+              {item.text}
+            </Text>
+          </View>
         </View>
-
-        <Text style={styles.cardText} numberOfLines={2}>
-          {item.text}
-        </Text>
-
-        <View style={styles.cardMeta}>
-          <Text style={styles.metaText}>
-            {lang?.flag} {lang?.name}
-          </Text>
-          <Text style={styles.metaDot}>•</Text>
-          <Text style={styles.metaText}>
-            {item.settings?.voice === 'male' ? '👨' : '👩'} {item.settings?.voice}
-          </Text>
-          <Text style={styles.metaDot}>•</Text>
-          <Text style={styles.metaText}>{formatDate(item.dateCreated)}</Text>
-        </View>
-
-        <Pressable
-          style={[styles.playBtn, isCurrentPlaying && styles.stopBtn]}
-          onPress={() => handlePlay(item)}
-        >
-          <Text style={styles.playBtnText}>
-            {isCurrentPlaying ? '⏹️ Stop' : '▶️ Play'}
-          </Text>
-        </Pressable>
-      </View>
+        <Text style={styles.itemDuration}>{formatDuration(item.text)}</Text>
+      </Pressable>
     );
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>📚 Library</Text>
-        <Text style={styles.subtitle}>
-          {audioFiles.length} saved {audioFiles.length === 1 ? 'item' : 'items'}
-        </Text>
+        <Text style={styles.title}>Library</Text>
       </View>
-
-      {/* Search */}
-      {audioFiles.length > 0 && (
-        <View style={styles.searchContainer}>
-          <Text style={styles.searchIcon}>🔍</Text>
-          <TextInput
-            style={styles.searchInput}
-            value={searchQuery}
-            onChangeText={handleSearch}
-            placeholder="Search..."
-            placeholderTextColor="#9CA3AF"
-          />
-          {searchQuery.length > 0 && (
-            <Pressable onPress={() => handleSearch('')}>
-              <Text style={styles.clearBtn}>✕</Text>
-            </Pressable>
-          )}
-        </View>
-      )}
 
       {/* List */}
       <FlatList
-        data={filteredFiles}
+        data={audioFiles}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={[
           styles.listContent,
-          filteredFiles.length === 0 && styles.emptyList,
+          audioFiles.length === 0 && styles.emptyList,
         ]}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh}
+            tintColor="#2563EB"
+          />
         }
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>📭</Text>
-            <Text style={styles.emptyTitle}>
-              {searchQuery ? 'No results' : 'No saved items'}
-            </Text>
+            <View style={styles.emptyIconContainer}>
+              <Music size={32} color="#9CA3AF" />
+            </View>
+            <Text style={styles.emptyTitle}>No saved audio</Text>
             <Text style={styles.emptyText}>
-              {searchQuery
-                ? 'Try a different search'
-                : 'Save text from the TTS screen to see it here'}
+              Save text from the TTS screen to build your library
             </Text>
           </View>
         }
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
       />
+
+      {/* Now Playing Bar */}
+      {currentPlaying && (
+        <View style={[styles.nowPlayingBar, { paddingBottom: insets.bottom + 70 }]}>
+          <View style={styles.nowPlayingContent}>
+            <View style={styles.nowPlayingInfo}>
+              <Text style={styles.nowPlayingLabel}>NOW PLAYING</Text>
+              <Text style={styles.nowPlayingTitle} numberOfLines={1}>
+                {currentPlaying.name}
+              </Text>
+            </View>
+            <Pressable 
+              style={styles.nowPlayingButton}
+              onPress={() => handlePlay(currentPlaying)}
+            >
+              <Pause size={16} color="#1F2937" />
+            </Pressable>
+          </View>
+          <View style={styles.progressBar}>
+            <View style={styles.progressFill} />
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -221,143 +198,147 @@ export default function AudioLibraryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
   },
   header: {
-    paddingTop: 60,
+    paddingTop: 16,
     paddingHorizontal: 20,
-    paddingBottom: 16,
-    backgroundColor: '#6366F1',
+    paddingBottom: 20,
   },
   title: {
     fontSize: 28,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#C7D2FE',
-    marginTop: 4,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 16,
-    marginTop: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  searchIcon: {
-    fontSize: 16,
-    marginRight: 10,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
+    fontFamily: 'SF-Pro-Bold',
     color: '#1F2937',
   },
-  clearBtn: {
-    fontSize: 18,
-    color: '#9CA3AF',
-    paddingLeft: 10,
-  },
   listContent: {
-    padding: 16,
-    paddingBottom: 100,
+    paddingHorizontal: 20,
+    paddingBottom: 120,
   },
   emptyList: {
     flex: 1,
   },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  cardHeader: {
+  listItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    justifyContent: 'space-between',
+    paddingVertical: 16,
   },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
+  itemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
   },
-  deleteBtn: {
-    padding: 4,
-  },
-  deleteBtnText: {
-    fontSize: 18,
-  },
-  cardText: {
-    fontSize: 14,
-    color: '#6B7280',
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  cardMeta: {
-    flexDirection: 'row',
+  playIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F3F4F6',
     alignItems: 'center',
-    marginBottom: 12,
+    justifyContent: 'center',
+    marginRight: 14,
   },
-  metaText: {
-    fontSize: 12,
+  playIconActive: {
+    backgroundColor: '#2563EB',
+  },
+  itemInfo: {
+    flex: 1,
+  },
+  itemTitle: {
+    fontSize: 16,
+    fontFamily: 'SF-Pro-Medium',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  itemSubtitle: {
+    fontSize: 14,
+    fontFamily: 'SF-Pro-Regular',
     color: '#9CA3AF',
   },
-  metaDot: {
-    fontSize: 12,
-    color: '#D1D5DB',
-    marginHorizontal: 8,
-  },
-  playBtn: {
-    backgroundColor: '#6366F1',
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  stopBtn: {
-    backgroundColor: '#EF4444',
-  },
-  playBtnText: {
+  itemDuration: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontFamily: 'SF-Pro-Regular',
+    color: '#6B7280',
+    marginLeft: 12,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
   },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 60,
+    paddingVertical: 80,
   },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 16,
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#374151',
+    fontFamily: 'SF-Pro-Medium',
+    color: '#1F2937',
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
+    fontFamily: 'SF-Pro-Regular',
     color: '#9CA3AF',
     textAlign: 'center',
     paddingHorizontal: 40,
+  },
+  nowPlayingBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#1F2937',
+    paddingTop: 16,
+    paddingHorizontal: 20,
+  },
+  nowPlayingContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  nowPlayingInfo: {
+    flex: 1,
+  },
+  nowPlayingLabel: {
+    fontSize: 10,
+    fontFamily: 'SF-Pro-Medium',
+    color: '#9CA3AF',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  nowPlayingTitle: {
+    fontSize: 16,
+    fontFamily: 'SF-Pro-Medium',
+    color: '#FFFFFF',
+  },
+  nowPlayingButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  progressBar: {
+    height: 3,
+    backgroundColor: '#374151',
+    borderRadius: 2,
+  },
+  progressFill: {
+    width: '35%',
+    height: '100%',
+    backgroundColor: '#2563EB',
+    borderRadius: 2,
   },
 });

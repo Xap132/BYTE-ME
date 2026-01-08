@@ -123,10 +123,17 @@ class AudioManager {
    */
   async deleteAudioFile(audioFile) {
     try {
-      // Delete file from file system
-      const fileInfo = await FileSystem.getInfoAsync(audioFile.uri);
-      if (fileInfo.exists) {
-        await FileSystem.deleteAsync(audioFile.uri);
+      // Only delete file from file system if URI exists
+      if (audioFile.uri) {
+        try {
+          const fileInfo = await FileSystem.getInfoAsync(audioFile.uri);
+          if (fileInfo?.exists) {
+            await FileSystem.deleteAsync(audioFile.uri);
+          }
+        } catch (fsError) {
+          // Ignore file system errors - metadata removal is what matters
+          console.warn('Error deleting audio file from storage:', fsError);
+        }
       }
 
       // Remove from metadata

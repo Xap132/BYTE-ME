@@ -6,14 +6,14 @@ export const LANGUAGE_CODES = {
 
 // Available languages for the UI
 export const LANGUAGES = [
-  { id: 'en', name: 'English', flag: '🇺🇸' },
+  { id: 'en', name: 'English (US)', flag: '🇺🇸' },
   { id: 'fil', name: 'Filipino', flag: '🇵🇭' },
 ];
 
 // Voice types
 export const VOICE_TYPES = [
-  { id: 'male', name: 'Male' },
   { id: 'female', name: 'Female' },
+  { id: 'male', name: 'Male' },
 ];
 
 // Default TTS settings

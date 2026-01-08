@@ -1,29 +1,34 @@
-import { LANGUAGES, DEFAULT_SETTINGS, getLanguage } from '@/constants/voices';
-import { audioManager } from '@/services/audioManager';
-import { storageService } from '@/services/storageService';
-import { ttsService } from '@/services/ttsService';
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  StyleSheet,
   Alert,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+  Modal,
+  FlatList,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
+import { Play, Save, ChevronDown, Check } from 'lucide-react-native';
+import { ttsService } from '@/services/ttsService';
+import { audioManager } from '@/services/audioManager';
+import { storageService } from '@/services/storageService';
+import { LANGUAGES, DEFAULT_SETTINGS, getLanguage } from '@/constants/voices';
 
 export default function TTSScreen() {
+  const insets = useSafeAreaInsets();
   const [text, setText] = useState('');
   const [language, setLanguage] = useState('en');
   const [voice, setVoice] = useState('female');
   const [pitch, setPitch] = useState(DEFAULT_SETTINGS.pitch);
   const [speed, setSpeed] = useState(DEFAULT_SETTINGS.speed);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showLanguageModal, setShowLanguageModal] = useState(false);
 
   useEffect(() => {
     loadPreferences();
@@ -49,23 +54,12 @@ export default function TTSScreen() {
 
     try {
       setIsLoading(true);
-      setIsPlaying(true);
       await ttsService.speak({ text, language, voice, pitch, speed });
     } catch (error) {
       console.error('TTS Error:', error);
       Alert.alert('Error', 'Failed to speak text');
     } finally {
       setIsLoading(false);
-      setIsPlaying(false);
-    }
-  };
-
-  const handleStop = async () => {
-    try {
-      await ttsService.stop();
-      setIsPlaying(false);
-    } catch (error) {
-      console.error('Stop Error:', error);
     }
   };
 
@@ -92,28 +86,38 @@ export default function TTSScreen() {
     }
   };
 
+  const handleLanguageSelect = (langId) => {
+    setLanguage(langId);
+    setShowLanguageModal(false);
+  };
+
+  const estimateDuration = () => {
+    const wordsPerMinute = 150 * speed;
+    const words = text.trim().split(/\s+/).length;
+    const seconds = Math.ceil((words / wordsPerMinute) * 60);
+    return seconds > 0 ? `~${seconds}s` : '~0s';
+  };
+
   const currentLang = getLanguage(language);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>🎙️ Text to Speech</Text>
+          <Text style={styles.title}>Text to Speech</Text>
         </View>
 
-        {/* Main Content */}
-        <ScrollView
+        <ScrollView 
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
         >
-          {/* Text Input */}
-          <View style={styles.inputContainer}>
+          {/* Text Input Card */}
+          <View style={styles.inputCard}>
             <TextInput
               style={styles.textInput}
               placeholder="Type or paste your text here..."
@@ -123,157 +127,158 @@ export default function TTSScreen() {
               multiline
               textAlignVertical="top"
             />
-            <Text style={styles.charCount}>{text.length} characters</Text>
-          </View>
-
-          {/* Quick Settings Row */}
-          <View style={styles.quickSettings}>
-            {/* Language Selector */}
-            <View style={styles.settingBox}>
-              <Text style={styles.settingLabel}>Language</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={styles.pillRow}>
-                  {LANGUAGES.map((lang) => (
-                    <Pressable
-                      key={lang.id}
-                      style={[
-                        styles.pill,
-                        language === lang.id && styles.pillActive,
-                      ]}
-                      onPress={() => setLanguage(lang.id)}
-                    >
-                      <Text style={styles.pillEmoji}>{lang.flag}</Text>
-                      <Text
-                        style={[
-                          styles.pillText,
-                          language === lang.id && styles.pillTextActive,
-                        ]}
-                      >
-                        {lang.name}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </ScrollView>
-            </View>
-
-            {/* Voice Type */}
-            <View style={styles.settingBox}>
-              <Text style={styles.settingLabel}>Voice</Text>
-              <View style={styles.voiceButtons}>
-                <Pressable
-                  style={[
-                    styles.voiceBtn,
-                    voice === 'male' && styles.voiceBtnActive,
-                  ]}
-                  onPress={() => setVoice('male')}
-                >
-                  <Text style={styles.voiceEmoji}>👨</Text>
-                  <Text
-                    style={[
-                      styles.voiceBtnText,
-                      voice === 'male' && styles.voiceBtnTextActive,
-                    ]}
-                  >
-                    Male
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={[
-                    styles.voiceBtn,
-                    voice === 'female' && styles.voiceBtnActive,
-                  ]}
-                  onPress={() => setVoice('female')}
-                >
-                  <Text style={styles.voiceEmoji}>👩</Text>
-                  <Text
-                    style={[
-                      styles.voiceBtnText,
-                      voice === 'female' && styles.voiceBtnTextActive,
-                    ]}
-                  >
-                    Female
-                  </Text>
-                </Pressable>
-              </View>
+            <View style={styles.inputFooter}>
+              <Text style={styles.charCount}>{text.length} characters</Text>
+              <Text style={styles.duration}>{estimateDuration()}</Text>
             </View>
           </View>
 
-          {/* Sliders */}
-          <View style={styles.slidersContainer}>
-            {/* Speed Slider */}
-            <View style={styles.sliderBox}>
-              <View style={styles.sliderHeader}>
-                <Text style={styles.sliderLabel}>⚡ Speed</Text>
-                <Text style={styles.sliderValue}>{speed.toFixed(1)}x</Text>
-              </View>
-              <Slider
-                style={styles.slider}
-                minimumValue={0.25}
-                maximumValue={2.0}
-                step={0.1}
-                value={speed}
-                onValueChange={setSpeed}
-                minimumTrackTintColor="#6366F1"
-                maximumTrackTintColor="#E5E7EB"
-                thumbTintColor="#6366F1"
-              />
-              <View style={styles.sliderLabels}>
-                <Text style={styles.sliderMinMax}>Slow</Text>
-                <Text style={styles.sliderMinMax}>Fast</Text>
-              </View>
-            </View>
+          {/* Language Selector - Dropdown */}
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>LANGUAGE</Text>
+            <TouchableOpacity 
+              style={styles.selectorButton}
+              onPress={() => setShowLanguageModal(true)}
+            >
+              <Text style={styles.selectorFlag}>{currentLang?.flag || '🇺🇸'}</Text>
+              <Text style={styles.selectorText}>{currentLang?.name || 'English'}</Text>
+              <ChevronDown size={20} color="#9CA3AF" />
+            </TouchableOpacity>
+          </View>
 
-            {/* Pitch Slider */}
-            <View style={styles.sliderBox}>
-              <View style={styles.sliderHeader}>
-                <Text style={styles.sliderLabel}>🎵 Pitch</Text>
-                <Text style={styles.sliderValue}>{pitch.toFixed(1)}x</Text>
-              </View>
-              <Slider
-                style={styles.slider}
-                minimumValue={0.5}
-                maximumValue={2.0}
-                step={0.1}
-                value={pitch}
-                onValueChange={setPitch}
-                minimumTrackTintColor="#6366F1"
-                maximumTrackTintColor="#E5E7EB"
-                thumbTintColor="#6366F1"
-              />
-              <View style={styles.sliderLabels}>
-                <Text style={styles.sliderMinMax}>Low</Text>
-                <Text style={styles.sliderMinMax}>High</Text>
-              </View>
+          {/* Voice Selector - Fixed: Female first, Male second */}
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>VOICE</Text>
+            <View style={styles.segmentedControl}>
+              <TouchableOpacity
+                style={[
+                  styles.segment,
+                  voice === 'female' && styles.segmentActive,
+                ]}
+                onPress={() => setVoice('female')}
+              >
+                <Text
+                  style={[
+                    styles.segmentText,
+                    voice === 'female' && styles.segmentTextActive,
+                  ]}
+                >
+                  Female
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.segment,
+                  voice === 'male' && styles.segmentActive,
+                ]}
+                onPress={() => setVoice('male')}
+              >
+                <Text
+                  style={[
+                    styles.segmentText,
+                    voice === 'male' && styles.segmentTextActive,
+                  ]}
+                >
+                  Male
+                </Text>
+              </TouchableOpacity>
             </View>
+          </View>
+
+          {/* Pitch Slider */}
+          <View style={styles.sliderSection}>
+            <View style={styles.sliderHeader}>
+              <Text style={styles.sliderLabel}>Pitch</Text>
+              <Text style={styles.sliderValue}>{pitch.toFixed(1)}</Text>
+            </View>
+            <Slider
+              style={styles.slider}
+              minimumValue={0.5}
+              maximumValue={2.0}
+              value={pitch}
+              onValueChange={setPitch}
+              step={0.1}
+              minimumTrackTintColor="#2563EB"
+              maximumTrackTintColor="#E5E7EB"
+              thumbTintColor="#2563EB"
+            />
+          </View>
+
+          {/* Speed Slider */}
+          <View style={styles.sliderSection}>
+            <View style={styles.sliderHeader}>
+              <Text style={styles.sliderLabel}>Speed</Text>
+              <Text style={styles.sliderValue}>{speed.toFixed(1)}x</Text>
+            </View>
+            <Slider
+              style={styles.slider}
+              minimumValue={0.5}
+              maximumValue={2.0}
+              value={speed}
+              onValueChange={setSpeed}
+              step={0.1}
+              minimumTrackTintColor="#2563EB"
+              maximumTrackTintColor="#E5E7EB"
+              thumbTintColor="#2563EB"
+            />
+          </View>
+
+          {/* Action Buttons */}
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={[styles.playButton, isLoading && styles.buttonDisabled]}
+              onPress={handlePlay}
+              disabled={isLoading}
+            >
+              <Play size={18} color="#FFFFFF" fill="#FFFFFF" />
+              <Text style={styles.playButtonText}>Play</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.saveButton, isLoading && styles.buttonDisabled]}
+              onPress={handleSave}
+              disabled={isLoading}
+            >
+              <Save size={18} color="#1F2937" />
+              <Text style={styles.saveButtonText}>Save</Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
-
-        {/* Fixed Bottom Controls */}
-        <View style={styles.bottomControls}>
-          <Pressable
-            style={[styles.saveBtn, !text.trim() && styles.btnDisabled]}
-            onPress={handleSave}
-            disabled={!text.trim() || isLoading}
-          >
-            <Text style={styles.saveBtnText}>💾 Save</Text>
-          </Pressable>
-
-          <Pressable
-            style={[
-              styles.playBtn,
-              isPlaying && styles.stopBtn,
-              !text.trim() && styles.btnDisabled,
-            ]}
-            onPress={isPlaying ? handleStop : handlePlay}
-            disabled={!text.trim() || isLoading}
-          >
-            <Text style={styles.playBtnText}>
-              {isLoading ? '⏳' : isPlaying ? '⏹️ Stop' : '▶️ Play'}
-            </Text>
-          </Pressable>
-        </View>
       </KeyboardAvoidingView>
+
+      {/* Language Selection Modal */}
+      <Modal
+        visible={showLanguageModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowLanguageModal(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowLanguageModal(false)}
+        >
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Select Language</Text>
+            <FlatList
+              data={LANGUAGES}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.languageItem}
+                  onPress={() => handleLanguageSelect(item.id)}
+                >
+                  <Text style={styles.languageFlag}>{item.flag}</Text>
+                  <Text style={styles.languageName}>{item.name}</Text>
+                  {language === item.id && (
+                    <Check size={20} color="#2563EB" />
+                  )}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -281,139 +286,115 @@ export default function TTSScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
   },
   keyboardView: {
     flex: 1,
   },
   header: {
-    paddingTop: 60,
+    paddingTop: 16,
     paddingHorizontal: 20,
-    paddingBottom: 16,
-    backgroundColor: '#6366F1',
+    paddingBottom: 20,
   },
   title: {
     fontSize: 28,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
+    fontFamily: 'SF-Pro-Bold',
+    color: '#1F2937',
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: 16,
+    paddingHorizontal: 20,
     paddingBottom: 120,
   },
-  inputContainer: {
-    backgroundColor: '#FFFFFF',
+  inputCard: {
+    backgroundColor: '#F3F4F6',
     borderRadius: 16,
     padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    marginBottom: 24,
   },
   textInput: {
     fontSize: 16,
+    fontFamily: 'SF-Pro-Regular',
     color: '#1F2937',
-    minHeight: 120,
-    maxHeight: 200,
+    minHeight: 140,
+    textAlignVertical: 'top',
+  },
+  inputFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 12,
   },
   charCount: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    textAlign: 'right',
-    marginTop: 8,
+    fontSize: 13,
+    fontFamily: 'SF-Pro-Medium',
+    color: '#2563EB',
   },
-  quickSettings: {
-    marginBottom: 16,
-  },
-  settingBox: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  settingLabel: {
-    fontSize: 14,
-    fontWeight: '600',
+  duration: {
+    fontSize: 13,
+    fontFamily: 'SF-Pro-Regular',
     color: '#6B7280',
-    marginBottom: 12,
   },
-  pillRow: {
-    flexDirection: 'row',
-    gap: 8,
+  section: {
+    marginBottom: 20,
   },
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 20,
-    gap: 6,
+  sectionLabel: {
+    fontSize: 12,
+    fontFamily: 'SF-Pro-Medium',
+    color: '#6B7280',
+    marginBottom: 8,
+    letterSpacing: 0.5,
   },
-  pillActive: {
-    backgroundColor: '#6366F1',
-  },
-  pillEmoji: {
-    fontSize: 16,
-  },
-  pillText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#4B5563',
-  },
-  pillTextActive: {
-    color: '#FFFFFF',
-  },
-  voiceButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  voiceBtn: {
-    flex: 1,
+  selectorButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F3F4F6',
-    paddingVertical: 14,
-    borderRadius: 12,
-    gap: 8,
-  },
-  voiceBtnActive: {
-    backgroundColor: '#6366F1',
-  },
-  voiceEmoji: {
-    fontSize: 20,
-  },
-  voiceBtnText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#4B5563',
-  },
-  voiceBtnTextActive: {
-    color: '#FFFFFF',
-  },
-  slidersContainer: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
     padding: 16,
+  },
+  selectorFlag: {
+    fontSize: 18,
+    marginRight: 12,
+  },
+  selectorText: {
+    flex: 1,
+    fontSize: 16,
+    fontFamily: 'SF-Pro-Medium',
+    color: '#1F2937',
+  },
+  segmentedControl: {
+    flexDirection: 'row',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    padding: 4,
+  },
+  segment: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderRadius: 10,
+  },
+  segmentActive: {
+    backgroundColor: '#FFFFFF',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
     elevation: 2,
   },
-  sliderBox: {
-    marginBottom: 20,
+  segmentText: {
+    fontSize: 15,
+    fontFamily: 'SF-Pro-Medium',
+    color: '#6B7280',
+  },
+  segmentTextActive: {
+    color: '#1F2937',
+  },
+  sliderSection: {
+    marginBottom: 24,
   },
   sliderHeader: {
     flexDirection: 'row',
@@ -422,68 +403,96 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sliderLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
+    fontSize: 16,
+    fontFamily: 'SF-Pro-Medium',
+    color: '#1F2937',
   },
   sliderValue: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#6366F1',
+    fontSize: 16,
+    fontFamily: 'SF-Pro-Medium',
+    color: '#6B7280',
   },
   slider: {
     width: '100%',
     height: 40,
   },
-  sliderLabels: {
+  buttonRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  sliderMinMax: {
-    fontSize: 12,
-    color: '#9CA3AF',
-  },
-  bottomControls: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    padding: 16,
-    paddingBottom: 32,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
     gap: 12,
+    marginTop: 8,
   },
-  saveBtn: {
-    flex: 1,
-    backgroundColor: '#E5E7EB',
-    paddingVertical: 16,
-    borderRadius: 14,
-    alignItems: 'center',
-  },
-  saveBtnText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#374151',
-  },
-  playBtn: {
+  playButton: {
     flex: 2,
-    backgroundColor: '#6366F1',
-    paddingVertical: 16,
-    borderRadius: 14,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2563EB',
+    borderRadius: 12,
+    paddingVertical: 16,
+    gap: 8,
   },
-  stopBtn: {
-    backgroundColor: '#EF4444',
-  },
-  playBtnText: {
-    fontSize: 18,
-    fontWeight: '700',
+  playButtonText: {
+    fontSize: 16,
+    fontFamily: 'SF-Pro-Medium',
     color: '#FFFFFF',
   },
-  btnDisabled: {
+  saveButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    paddingVertical: 16,
+    gap: 8,
+  },
+  saveButtonText: {
+    fontSize: 16,
+    fontFamily: 'SF-Pro-Medium',
+    color: '#1F2937',
+  },
+  buttonDisabled: {
     opacity: 0.5,
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+    width: '100%',
+    maxWidth: 340,
+    maxHeight: 400,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontFamily: 'SF-Pro-Bold',
+    color: '#1F2937',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  languageItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  languageFlag: {
+    fontSize: 24,
+    marginRight: 14,
+  },
+  languageName: {
+    flex: 1,
+    fontSize: 16,
+    fontFamily: 'SF-Pro-Regular',
+    color: '#1F2937',
   },
 });
