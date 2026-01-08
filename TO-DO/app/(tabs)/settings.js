@@ -164,11 +164,12 @@ export default function SettingsScreen() {
 
   const renderLanguageGroup = ({ item }) => {
     const currentVoice = selectedVoices[item.langKey];
+    // Default to "Voice A" (first voice) when no specific voice is selected
     const selectedVoiceName = currentVoice 
       ? item.voices.find(v => v.id === currentVoice)?.displayName || 
         item.voices.find(v => v.id === currentVoice)?.name || 
         'Selected'
-      : 'Auto';
+      : item.voices[0]?.displayName || 'Voice A';
     
     const isExpanded = expandedLang === item.langCode;
     
@@ -196,22 +197,6 @@ export default function SettingsScreen() {
         
         {isExpanded && (
           <View style={styles.voiceList}>
-            {/* Auto option */}
-            <TouchableOpacity 
-              style={[styles.voiceItem, !currentVoice && styles.voiceItemSelected]}
-              onPress={() => handleSelectVoice(item.langKey, null)}
-            >
-              <View style={styles.voiceInfo}>
-                <View style={styles.voiceNameRow}>
-                  <Text style={[styles.voiceName, !currentVoice && styles.voiceNameSelected]}>
-                    Auto (Default)
-                  </Text>
-                  {!currentVoice && <Check size={16} color="#2563EB" style={{ marginLeft: 8 }} />}
-                </View>
-                <Text style={styles.voiceDetails}>Let the app choose automatically</Text>
-              </View>
-            </TouchableOpacity>
-            
             {item.voices.map(voice => renderVoiceItem(voice, item.langKey))}
           </View>
         )}

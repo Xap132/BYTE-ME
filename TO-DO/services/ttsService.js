@@ -368,7 +368,7 @@ class TTSService {
   }
 
   /**
-   * Get user's selected voice for a language, or auto-detect
+   * Get user's selected voice for a language, or use first available (Voice A)
    */
   async _getVoiceForLanguage(langCode, prefKey) {
     try {
@@ -376,18 +376,41 @@ class TTSService {
       const userVoice = prefs[prefKey];
       
       if (userVoice) {
-        console.log(`[TTS] Using user-selected voice: ${userVoice}`);
+        console.log(`[TTS] Using user-selected voice: ${userVoice} for ${langCode}`);
         return userVoice;
       }
       
-      // Auto-detect: find first matching voice
+      // Get all available voices
       const voices = await Speech.getAvailableVoicesAsync();
-      const matching = voices.find(v => 
-        v.language === langCode ||
-        v.language?.startsWith(langCode.split('-')[0])
+      
+      // Find voices matching this language
+      // Try exact match first, then base language match
+      let matchingVoices = voices.filter(v => v.language === langCode);
+      
+      // If no exact match, try base language (e.g., 'en' for 'en-US')
+      if (matchingVoices.length === 0) {
+        const baseCode = langCode.split('-')[0];
+        matchingVoices = voices.filter(v => 
+          v.language && v.language.startsWith(baseCode + '-')
+        );
+      }
+      
+      // Sort by name for consistent "Voice A" selection
+      matchingVoices.sort((a, b) => 
+        (a.name || a.identifier || '').localeCompare(b.name || b.identifier || '')
       );
       
-      return matching?.identifier || null;
+      // Return first voice's identifier (Voice A) or null
+      const firstVoice = matchingVoices[0];
+      if (firstVoice) {
+        const voiceId = firstVoice.identifier || null;
+        console.log(`[TTS] Using default Voice A: ${voiceId} (${firstVoice.name}) for ${langCode}`);
+        return voiceId;
+      }
+      
+      // No voice found for this language - let system use default
+      console.log(`[TTS] No voice found for ${langCode}, using system default`);
+      return null;
     } catch (err) {
       console.warn('[TTS] Error getting voice:', err);
       return null;
@@ -694,18 +717,21 @@ class TTSService {
   }
 
   /**
-   * Get current voice preferences
+   * Get current voice preferences (all languages)
    */
   async getVoicePreferences() {
     try {
       const prefs = await storageService.loadPreferences();
-      return {
-        voiceUS: prefs.voiceUS || null,
-        voiceUK: prefs.voiceUK || null,
-        voiceFil: prefs.voiceFil || null,
-      };
+      // Return all voice-related preferences (voiceUS, voiceUK, voiceFil, voice_*)
+      const voicePrefs = {};
+      Object.keys(prefs).forEach(key => {
+        if (key.startsWith('voice') || key.startsWith('voice_')) {
+          voicePrefs[key] = prefs[key];
+        }
+      });
+      return voicePrefs;
     } catch {
-      return { voiceUS: null, voiceUK: null, voiceFil: null };
+      return {};
     }
   }
 

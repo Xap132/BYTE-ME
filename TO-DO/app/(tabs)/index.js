@@ -1,10 +1,10 @@
-import { DEFAULT_SETTINGS, getLanguage, LANGUAGES } from '@/constants/voices';
+import { DEFAULT_SETTINGS, getLanguage } from '@/constants/voices';
 import { audioManager } from '@/services/audioManager';
 import { storageService } from '@/services/storageService';
 import { ttsService } from '@/services/ttsService';
 import Slider from '@react-native-community/slider';
-import { Check, ChevronDown, Pause, Play, Save, Square } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { Check, ChevronDown, Pause, Play, RotateCcw, Save, Square } from 'lucide-react-native';
+import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -28,16 +28,31 @@ export default function TTSScreen() {
   const [speed, setSpeed] = useState(DEFAULT_SETTINGS.speed);
   const [isLoading, setIsLoading] = useState(false);
   const [showLanguageModal, setShowLanguageModal] = useState(false);
+  
+  // Playback state
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [currentWordIndex, setCurrentWordIndex] = useState(-1);
+  const [progress, setProgress] = useState(0);
   
   // Dynamic languages state
   const [availableLanguages, setAvailableLanguages] = useState([]);
   const [loadingLanguages, setLoadingLanguages] = useState(false);
+  
+  // Sentence timing ref
+  const sentenceTimerRef = useRef(null);
+  const sentencesRef = useRef([]);
+  const startTimeRef = useRef(0);
+  const pausedTimeRef = useRef(0);
 
   useEffect(() => {
     loadPreferences();
     loadAvailableLanguages();
+    
+    return () => {
+      if (sentenceTimerRef.current) clearInterval(sentenceTimerRef.current);
+      ttsService.stop();
+    };
   }, []);
 
   const loadAvailableLanguages = async () => {
@@ -47,10 +62,9 @@ export default function TTSScreen() {
       setAvailableLanguages(languages);
     } catch (error) {
       console.error('Error loading languages:', error);
-      // Fallback to default languages
       setAvailableLanguages([
-        { id: 'en_us_f', name: 'US', flag: '🇺🇸', isPriority: true },
-        { id: 'en_uk_m', name: 'UK', flag: '🇬🇧', isPriority: true },
+        { id: 'en_us_f', name: 'English (US)', flag: '🇺🇸', isPriority: true },
+        { id: 'en_uk_m', name: 'English (UK)', flag: '🇬🇧', isPriority: true },
         { id: 'fil_f', name: 'Filipino', flag: '🇵🇭', isPriority: true },
       ]);
     } finally {
@@ -70,29 +84,99 @@ export default function TTSScreen() {
     }
   };
 
+  // Split text into sentences
+  const getSentences = (inputText) => {
+    // Split by sentence endings (.!?) but keep the punctuation
+    return inputText.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 0);
+  };
+
+  // Calculate estimated duration per sentence based on word count
+  const getSentenceDuration = (sentence) => {
+    const words = sentence.trim().split(/\s+/).length;
+    // ~150 words per minute at 1.0x speed = ~400ms per word
+    return (words * 400) / speed;
+  };
+
+  // Start sentence highlighting
+  const startSentenceHighlighting = (fromIndex = 0, elapsedOffset = 0) => {
+    sentencesRef.current = getSentences(text);
+    setCurrentWordIndex(fromIndex); // Using wordIndex for sentence index
+    startTimeRef.current = Date.now() - elapsedOffset;
+    
+    if (sentenceTimerRef.current) clearInterval(sentenceTimerRef.current);
+    
+    // Calculate cumulative durations
+    let cumulativeDurations = [];
+    let total = 0;
+    sentencesRef.current.forEach((sentence, idx) => {
+      total += getSentenceDuration(sentence);
+      cumulativeDurations.push(total);
+    });
+    
+    const totalDuration = total;
+    
+    sentenceTimerRef.current = setInterval(() => {
+      const elapsed = Date.now() - startTimeRef.current;
+      
+      // Find which sentence we're on based on elapsed time
+      let currentSentence = fromIndex;
+      for (let i = fromIndex; i < cumulativeDurations.length; i++) {
+        if (elapsed < cumulativeDurations[i] - (fromIndex > 0 ? cumulativeDurations[fromIndex - 1] || 0 : 0)) {
+          currentSentence = i;
+          break;
+        }
+        currentSentence = i;
+      }
+      
+      setCurrentWordIndex(currentSentence);
+      const newProgress = Math.min(elapsed / totalDuration, 1);
+      setProgress(newProgress);
+      
+      if (newProgress >= 1) {
+        handlePlaybackComplete();
+      }
+    }, 100);
+  };
+
+  const stopSentenceHighlighting = () => {
+    if (sentenceTimerRef.current) {
+      clearInterval(sentenceTimerRef.current);
+      sentenceTimerRef.current = null;
+    }
+    setCurrentWordIndex(-1);
+    setProgress(0);
+  };
+
+  const handlePlaybackComplete = () => {
+    stopSentenceHighlighting();
+    setIsPlaying(false);
+    setIsPaused(false);
+  };
+
   const handlePlay = async () => {
     if (!text.trim()) {
       Alert.alert('Empty Text', 'Please enter some text to speak');
       return;
     }
 
-    // If already playing, do nothing
     if (isPlaying && !isPaused) return;
 
     try {
       setIsLoading(true);
       setIsPlaying(true);
       setIsPaused(false);
+      pausedTimeRef.current = 0;
+      startSentenceHighlighting(0, 0);
+      
       await ttsService.speak({ text, language, pitch, speed });
+      
       // Speech finished naturally
-      setIsPlaying(false);
-      setIsPaused(false);
+      handlePlaybackComplete();
     } catch (error) {
       console.error('TTS Error:', error);
       Alert.alert('Error', 'Failed to speak text');
+      handlePlaybackComplete();
     } finally {
-      setIsPlaying(false);
-      setIsPaused(false);
       setIsLoading(false);
     }
   };
@@ -102,19 +186,29 @@ export default function TTSScreen() {
       // Resume
       setIsPaused(false);
       setIsPlaying(true);
+      startSentenceHighlighting(currentWordIndex, pausedTimeRef.current);
       await ttsService.resume();
     } else if (isPlaying) {
-      // Pause
+      // Pause - save current position
+      pausedTimeRef.current = Date.now() - startTimeRef.current;
       setIsPlaying(false);
       setIsPaused(true);
+      if (sentenceTimerRef.current) {
+        clearInterval(sentenceTimerRef.current);
+        sentenceTimerRef.current = null;
+      }
       await ttsService.pause();
     }
   };
 
   const handleStop = async () => {
-    setIsPlaying(false);
-    setIsPaused(false);
     await ttsService.stop();
+    handlePlaybackComplete();
+  };
+
+  const handleRestart = async () => {
+    await handleStop();
+    setTimeout(() => handlePlay(), 100);
   };
 
   const handleSave = async () => {
@@ -158,7 +252,29 @@ export default function TTSScreen() {
     return seconds > 0 ? `~${seconds}s` : '~0s';
   };
 
-  // Get current language from available languages (dynamic) or fallback to static
+  // Render text with SENTENCE highlighting
+  const renderHighlightedText = () => {
+    if (!text) return null;
+    
+    const sentences = getSentences(text);
+    
+    return sentences.map((sentence, idx) => {
+      const isHighlighted = idx === currentWordIndex && (isPlaying || isPaused);
+      
+      return (
+        <Text 
+          key={idx}
+          style={[
+            styles.textSentence,
+            isHighlighted && styles.textSentenceHighlighted
+          ]}
+        >
+          {sentence}{idx < sentences.length - 1 ? ' ' : ''}
+        </Text>
+      );
+    });
+  };
+
   const currentLang = availableLanguages.find(l => l.id === language) || getLanguage(language);
 
   return (
@@ -177,19 +293,27 @@ export default function TTSScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Text Input Card */}
+          {/* Text Input Card - with sentence highlighting when playing */}
           <View style={styles.inputCard}>
-            <View style={styles.textInputContainer}>
-              <TextInput
-                style={styles.textInput}
-                placeholder="Type or paste your text here..."
-                placeholderTextColor="#9CA3AF"
-                value={text}
-                onChangeText={setText}
-                multiline
-                textAlignVertical="top"
-              />
-            </View>
+            {(isPlaying || isPaused) && text ? (
+              <ScrollView style={styles.highlightContainer} nestedScrollEnabled>
+                <Text style={styles.highlightText}>
+                  {renderHighlightedText()}
+                </Text>
+              </ScrollView>
+            ) : (
+              <View style={styles.textInputContainer}>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Type or paste your text here..."
+                  placeholderTextColor="#9CA3AF"
+                  value={text}
+                  onChangeText={setText}
+                  multiline
+                  textAlignVertical="top"
+                />
+              </View>
+            )}
             
             <View style={styles.inputFooter}>
               <Text style={styles.charCount}>{text.length} characters</Text>
@@ -270,25 +394,37 @@ export default function TTSScreen() {
           </View>
         </ScrollView>
 
-        {/* Sticky Playback Controls */}
+        {/* Sticky Playback Controls - Redesigned */}
         {(isPlaying || isPaused) && (
           <View style={[styles.stickyPlayer, { paddingBottom: insets.bottom + 70 }]}>
-            <View style={styles.playerInfo}>
-              <Text style={styles.playerTitle} numberOfLines={1}>
-                {text.substring(0, 50)}{text.length > 50 ? '...' : ''}
-              </Text>
-              <Text style={styles.playerSubtitle}>
-                {currentLang?.name || 'English'}
-              </Text>
+            <View style={styles.playerHeader}>
+              <View style={styles.playerInfo}>
+                <Text style={styles.playerTitle} numberOfLines={1}>
+                  {text.substring(0, 40)}{text.length > 40 ? '...' : ''}
+                </Text>
+                <Text style={styles.playerSubtitle}>
+                  {currentLang?.name || 'English'} • {Math.round(progress * 100)}%
+                </Text>
+              </View>
             </View>
+            
+            {/* Control Buttons Row */}
             <View style={styles.playerControls}>
+              {/* Restart */}
+              <TouchableOpacity style={styles.playerBtn} onPress={handleRestart}>
+                <RotateCcw size={20} color="#6B7280" />
+              </TouchableOpacity>
+              
+              {/* Play/Pause Main Button */}
               <TouchableOpacity style={styles.playerMainBtn} onPress={handlePause}>
                 {isPaused ? (
-                  <Play size={24} color="#FFFFFF" fill="#FFFFFF" />
+                  <Play size={28} color="#FFFFFF" fill="#FFFFFF" />
                 ) : (
-                  <Pause size={24} color="#FFFFFF" fill="#FFFFFF" />
+                  <Pause size={28} color="#FFFFFF" fill="#FFFFFF" />
                 )}
               </TouchableOpacity>
+              
+              {/* Stop */}
               <TouchableOpacity style={styles.playerStopBtn} onPress={handleStop}>
                 <Square size={18} color="#EF4444" fill="#EF4444" />
               </TouchableOpacity>
@@ -411,7 +547,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   textInputContainer: {
-    position: 'relative',
+    minHeight: 140,
   },
   textInput: {
     fontSize: 16,
@@ -419,6 +555,28 @@ const styles = StyleSheet.create({
     color: '#1F2937',
     minHeight: 140,
     textAlignVertical: 'top',
+  },
+  // Sentence highlighting styles
+  highlightContainer: {
+    minHeight: 140,
+    maxHeight: 200,
+  },
+  highlightText: {
+    fontSize: 16,
+    fontFamily: 'SF-Pro-Regular',
+    color: '#1F2937',
+    lineHeight: 26,
+  },
+  textSentence: {
+    fontSize: 16,
+    fontFamily: 'SF-Pro-Regular',
+    color: '#6B7280',
+    lineHeight: 26,
+  },
+  textSentenceHighlighted: {
+    backgroundColor: '#DBEAFE',
+    color: '#1F2937',
+    fontFamily: 'SF-Pro-Medium',
   },
   inputFooter: {
     flexDirection: 'row',
@@ -628,42 +786,56 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
-    paddingTop: 12,
-    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingHorizontal: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 10,
   },
+  playerHeader: {
+    marginBottom: 16,
+  },
   playerInfo: {
-    marginBottom: 12,
+    alignItems: 'center',
   },
   playerTitle: {
     fontSize: 14,
     fontFamily: 'SF-Pro-Medium',
     color: '#1F2937',
-    marginBottom: 2,
+    marginBottom: 4,
+    textAlign: 'center',
   },
   playerSubtitle: {
     fontSize: 12,
     fontFamily: 'SF-Pro-Regular',
     color: '#6B7280',
+    textAlign: 'center',
   },
   playerControls: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 16,
+    gap: 12,
     paddingBottom: 8,
   },
+  playerBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   playerMainBtn: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: '#2563EB',
     alignItems: 'center',
     justifyContent: 'center',
+    marginHorizontal: 8,
   },
   playerStopBtn: {
     width: 44,
