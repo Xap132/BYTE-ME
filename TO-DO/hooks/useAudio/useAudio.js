@@ -1,5 +1,5 @@
-import { useState, useCallback, useRef } from 'react';
 import { Audio } from 'expo-av';
+import { useCallback, useRef, useState } from 'react';
 
 /**
  * useAudio Hook

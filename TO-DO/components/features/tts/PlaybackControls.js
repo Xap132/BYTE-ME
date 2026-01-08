@@ -1,7 +1,6 @@
-import React from 'react';
-import { View } from 'react-native';
-import SliderComponent from '@/components/ui/base/Slider';
 import Card from '@/components/ui/base/Card';
+import SliderComponent from '@/components/ui/base/Slider';
+import React from 'react';
 
 /**
  * Playback Controls Feature Component

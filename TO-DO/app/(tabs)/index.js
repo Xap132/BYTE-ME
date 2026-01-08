@@ -1,30 +1,29 @@
-import { useState, useEffect } from 'react';
+import { DEFAULT_SETTINGS, getLanguage, LANGUAGES } from '@/constants/voices';
+import { audioManager } from '@/services/audioManager';
+import { storageService } from '@/services/storageService';
+import { ttsService } from '@/services/ttsService';
+import Slider from '@react-native-community/slider';
+import { Check, ChevronDown, Pause, Play, Save, SkipBack, SkipForward, Square } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
 import {
-  View,
+  Alert,
+  FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  ScrollView,
-  StyleSheet,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Modal,
-  FlatList,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Slider from '@react-native-community/slider';
-import { Play, Pause, Save, ChevronDown, Check, SkipBack, SkipForward, Square } from 'lucide-react-native';
-import { ttsService } from '@/services/ttsService';
-import { audioManager } from '@/services/audioManager';
-import { storageService } from '@/services/storageService';
-import { LANGUAGES, DEFAULT_SETTINGS, getLanguage } from '@/constants/voices';
 
 export default function TTSScreen() {
   const insets = useSafeAreaInsets();
   const [text, setText] = useState('');
-  const [language, setLanguage] = useState('en');
-  const [voice, setVoice] = useState('female');
+  const [language, setLanguage] = useState('en_us_f');
   const [pitch, setPitch] = useState(DEFAULT_SETTINGS.pitch);
   const [speed, setSpeed] = useState(DEFAULT_SETTINGS.speed);
   const [isLoading, setIsLoading] = useState(false);
@@ -39,8 +38,8 @@ export default function TTSScreen() {
   const loadPreferences = async () => {
     try {
       const prefs = await storageService.loadPreferences();
-      if (prefs.defaultLanguage) setLanguage(prefs.defaultLanguage);
-      if (prefs.defaultVoice) setVoice(prefs.defaultVoice);
+      if (prefs.defaultPresetLanguage) setLanguage(prefs.defaultPresetLanguage);
+      else if (prefs.defaultLanguage) setLanguage(prefs.defaultLanguage);
       if (prefs.defaultPitch) setPitch(prefs.defaultPitch);
       if (prefs.defaultSpeed) setSpeed(prefs.defaultSpeed);
     } catch (error) {
@@ -58,7 +57,7 @@ export default function TTSScreen() {
       setIsLoading(true);
       setIsPlaying(true);
       setIsPaused(false);
-      await ttsService.speak({ text, language, voice, pitch, speed });
+      await ttsService.speak({ text, language, pitch, speed });
       setIsPlaying(false);
     } catch (error) {
       console.error('TTS Error:', error);
@@ -71,11 +70,15 @@ export default function TTSScreen() {
 
   const handlePause = async () => {
     if (isPaused) {
+      // Resume - will restart speech
       await ttsService.resume();
       setIsPaused(false);
+      setIsPlaying(true);
     } else {
+      // Pause
       await ttsService.pause();
       setIsPaused(true);
+      setIsPlaying(false);
     }
   };
 
@@ -104,7 +107,7 @@ export default function TTSScreen() {
       const prefs = await storageService.loadPreferences();
       await audioManager.saveAudioFile(
         text,
-        { language, voice, pitch, speed },
+        { language, pitch, speed },
         prefs.audioFormat || 'mp3'
       );
       Alert.alert('Saved!', 'Added to your Library');
@@ -116,9 +119,15 @@ export default function TTSScreen() {
     }
   };
 
-  const handleLanguageSelect = (langId) => {
+  const handleLanguageSelect = async (langId) => {
     setLanguage(langId);
     setShowLanguageModal(false);
+    try {
+      const prefs = await storageService.loadPreferences();
+      await storageService.savePreferences({ ...prefs, defaultPresetLanguage: langId });
+    } catch (error) {
+      console.error('Error saving language preference:', error);
+    }
   };
 
   const estimateDuration = () => {
@@ -174,45 +183,6 @@ export default function TTSScreen() {
               <Text style={styles.selectorText}>{currentLang?.name || 'English'}</Text>
               <ChevronDown size={20} color="#9CA3AF" />
             </TouchableOpacity>
-          </View>
-
-          {/* Voice Selector - Fixed: Female first, Male second */}
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>VOICE</Text>
-            <View style={styles.segmentedControl}>
-              <TouchableOpacity
-                style={[
-                  styles.segment,
-                  voice === 'female' && styles.segmentActive,
-                ]}
-                onPress={() => setVoice('female')}
-              >
-                <Text
-                  style={[
-                    styles.segmentText,
-                    voice === 'female' && styles.segmentTextActive,
-                  ]}
-                >
-                  Female
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.segment,
-                  voice === 'male' && styles.segmentActive,
-                ]}
-                onPress={() => setVoice('male')}
-              >
-                <Text
-                  style={[
-                    styles.segmentText,
-                    voice === 'male' && styles.segmentTextActive,
-                  ]}
-                >
-                  Male
-                </Text>
-              </TouchableOpacity>
-            </View>
           </View>
 
           {/* Pitch Slider */}
@@ -276,14 +246,14 @@ export default function TTSScreen() {
         </ScrollView>
 
         {/* Sticky Playback Controls */}
-        {isPlaying && (
+        {(isPlaying || isPaused) && (
           <View style={[styles.stickyPlayer, { paddingBottom: insets.bottom + 70 }]}>
             <View style={styles.playerInfo}>
               <Text style={styles.playerTitle} numberOfLines={1}>
                 {text.substring(0, 50)}{text.length > 50 ? '...' : ''}
               </Text>
               <Text style={styles.playerSubtitle}>
-                {getLanguage(language)?.name} • {voice === 'male' ? 'Male' : 'Female'}
+                {getLanguage(language)?.name}
               </Text>
             </View>
             <View style={styles.playerControls}>
@@ -357,11 +327,25 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingHorizontal: 20,
     paddingBottom: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   title: {
     fontSize: 28,
     fontFamily: 'SF-Pro-Bold',
     color: '#1F2937',
+  },
+  debugButton: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  debugButtonText: {
+    fontSize: 12,
+    fontFamily: 'SF-Pro-Medium',
+    color: '#6B7280',
   },
   scrollView: {
     flex: 1,

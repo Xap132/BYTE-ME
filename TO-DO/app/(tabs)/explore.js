@@ -1,19 +1,18 @@
-import { getLanguage } from '@/constants/voices';
 import { audioManager } from '@/services/audioManager';
 import { ttsService } from '@/services/ttsService';
 import { useFocusEffect } from '@react-navigation/native';
+import { Music, Pause, Play } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import {
-  Alert,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  View,
+    Alert,
+    FlatList,
+    Pressable,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Play, Pause, Music } from 'lucide-react-native';
 
 export default function AudioLibraryScreen() {
   const insets = useSafeAreaInsets();
@@ -54,12 +53,22 @@ export default function AudioLibraryScreen() {
         await ttsService.stop();
         setPlayingId(audioFile.id);
         setCurrentPlaying(audioFile);
+
+        const language =
+          audioFile.language ?? audioFile.settings?.language ?? 'en_us_f';
+        const voice =
+          audioFile.voiceType ?? audioFile.voice ?? audioFile.settings?.voice ?? 'female';
+        const pitch =
+          audioFile.pitch ?? audioFile.settings?.pitch ?? 1.0;
+        const speed =
+          audioFile.speed ?? audioFile.settings?.speed ?? 1.0;
+
         await ttsService.speak({
           text: audioFile.text,
-          language: audioFile.settings?.language || 'en',
-          voice: audioFile.settings?.voice || 'female',
-          pitch: audioFile.settings?.pitch || 1.0,
-          speed: audioFile.settings?.speed || 1.0,
+          language,
+          voice,
+          pitch,
+          speed,
         });
         setPlayingId(null);
         setCurrentPlaying(null);

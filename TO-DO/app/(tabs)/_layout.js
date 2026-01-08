@@ -1,9 +1,8 @@
 import { Tabs } from 'expo-router';
-import { View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Library, Mic, Settings } from 'lucide-react-native';
 import { useEffect, useRef } from 'react';
-import { Animated } from 'react-native';
-import { Mic, Library, Settings } from 'lucide-react-native';
+import { Animated, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 function TabIcon({ Icon, focused }) {
   const scaleAnim = useRef(new Animated.Value(focused ? 1 : 0.8)).current;

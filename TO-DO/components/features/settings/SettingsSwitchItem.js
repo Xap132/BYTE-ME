@@ -1,6 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Switch, TouchableOpacity } from 'react-native';
-import Card from '@/components/ui/base/Card';
+import { StyleSheet, Switch, Text, View } from 'react-native';
 
 /**
  * Settings Switch Item Component

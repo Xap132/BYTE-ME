@@ -5,6 +5,15 @@ const PREFERENCES_KEY = '@tts_user_preferences';
 const AUDIO_METADATA_KEY = '@tts_audio_metadata';
 
 const DEFAULT_PREFERENCES = {
+  // New: single preset selection (3 options)
+  defaultPresetLanguage: 'en_us_f',
+
+  // User-selected voice IDs for each language
+  voiceUS: null,    // null = auto-detect
+  voiceUK: null,
+  voiceFil: null,
+
+  // Legacy (kept for compatibility)
   defaultVoice: 'female',
   defaultLanguage: 'en',
   defaultPitch: DEFAULT_SETTINGS.pitch,
@@ -14,6 +23,24 @@ const DEFAULT_PREFERENCES = {
   theme: 'system',
 };
 
+function migratePreferences(preferences) {
+  if (!preferences || typeof preferences !== 'object') return { ...DEFAULT_PREFERENCES };
+
+  const merged = { ...DEFAULT_PREFERENCES, ...preferences };
+
+  // If preset not present yet, derive from legacy fields.
+  if (!merged.defaultPresetLanguage) {
+    const legacyLanguage = merged.defaultLanguage || 'en';
+    const legacyVoice = merged.defaultVoice || 'female';
+
+    if (legacyLanguage === 'fil') merged.defaultPresetLanguage = 'fil_f';
+    else if (legacyLanguage === 'en' && legacyVoice === 'male') merged.defaultPresetLanguage = 'en_uk_m';
+    else merged.defaultPresetLanguage = 'en_us_f';
+  }
+
+  return merged;
+}
+
 class StorageService {
   /**
    * Load user preferences from storage
@@ -22,12 +49,12 @@ class StorageService {
     try {
       const data = await AsyncStorage.getItem(PREFERENCES_KEY);
       if (data) {
-        return JSON.parse(data);
+        return migratePreferences(JSON.parse(data));
       }
-      return DEFAULT_PREFERENCES;
+      return { ...DEFAULT_PREFERENCES };
     } catch (error) {
       console.error('Error loading preferences:', error);
-      return DEFAULT_PREFERENCES;
+      return { ...DEFAULT_PREFERENCES };
     }
   }
 
@@ -36,7 +63,10 @@ class StorageService {
    */
   async savePreferences(preferences) {
     try {
-      await AsyncStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences));
+      await AsyncStorage.setItem(
+        PREFERENCES_KEY,
+        JSON.stringify(migratePreferences(preferences))
+      );
     } catch (error) {
       console.error('Error saving preferences:', error);
       throw error;

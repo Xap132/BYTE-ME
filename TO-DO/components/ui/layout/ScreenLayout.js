@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, StyleSheet, SafeAreaView, StatusBar } from 'react-native';
+import { SafeAreaView, ScrollView, StatusBar, StyleSheet } from 'react-native';
 
 /**
  * Screen Layout Component

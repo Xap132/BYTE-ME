@@ -1,7 +1,7 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import SegmentedControl from '@/components/ui/base/SegmentedControl';
 import Card from '@/components/ui/base/Card';
+import SegmentedControl from '@/components/ui/base/SegmentedControl';
+import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 
 /**
  * Voice Selector Feature Component

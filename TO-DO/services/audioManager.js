@@ -1,3 +1,4 @@
+import { getPresetVoice } from '@/constants/voices';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 import { Platform } from 'react-native';
@@ -73,7 +74,7 @@ class AudioManager {
         duration: 0,
         dateCreated: timestamp,
         language: options.language,
-        voiceType: options.voice,
+        voiceType: options.voice || getPresetVoice(options.language),
         format: format,
         size: 0,
         pitch: options.pitch,

@@ -1,6 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import Card from '@/components/ui/base/Card';
+import { StyleSheet, Text, View } from 'react-native';
 
 /**
  * Empty State Component

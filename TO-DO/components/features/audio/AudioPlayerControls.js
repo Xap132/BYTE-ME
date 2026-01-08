@@ -1,6 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import Card from '@/components/ui/base/Card';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 /**
  * Audio Player Controls Component
