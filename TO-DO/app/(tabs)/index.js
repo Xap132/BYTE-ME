@@ -3,7 +3,7 @@ import { audioManager } from '@/services/audioManager';
 import { storageService } from '@/services/storageService';
 import { ttsService } from '@/services/ttsService';
 import Slider from '@react-native-community/slider';
-import { Check, ChevronDown, Pause, Play, Save, SkipBack, SkipForward, Square } from 'lucide-react-native';
+import { Check, ChevronDown, Pause, Play, Save, Square } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import {
   Alert,
@@ -30,10 +30,33 @@ export default function TTSScreen() {
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  
+  // Dynamic languages state
+  const [availableLanguages, setAvailableLanguages] = useState([]);
+  const [loadingLanguages, setLoadingLanguages] = useState(false);
 
   useEffect(() => {
     loadPreferences();
+    loadAvailableLanguages();
   }, []);
+
+  const loadAvailableLanguages = async () => {
+    try {
+      setLoadingLanguages(true);
+      const languages = await ttsService.getLanguageOptions();
+      setAvailableLanguages(languages);
+    } catch (error) {
+      console.error('Error loading languages:', error);
+      // Fallback to default languages
+      setAvailableLanguages([
+        { id: 'en_us_f', name: 'US', flag: '🇺🇸', isPriority: true },
+        { id: 'en_uk_m', name: 'UK', flag: '🇬🇧', isPriority: true },
+        { id: 'fil_f', name: 'Filipino', flag: '🇵🇭', isPriority: true },
+      ]);
+    } finally {
+      setLoadingLanguages(false);
+    }
+  };
 
   const loadPreferences = async () => {
     try {
@@ -53,47 +76,45 @@ export default function TTSScreen() {
       return;
     }
 
+    // If already playing, do nothing
+    if (isPlaying && !isPaused) return;
+
     try {
       setIsLoading(true);
       setIsPlaying(true);
       setIsPaused(false);
       await ttsService.speak({ text, language, pitch, speed });
+      // Speech finished naturally
       setIsPlaying(false);
+      setIsPaused(false);
     } catch (error) {
       console.error('TTS Error:', error);
       Alert.alert('Error', 'Failed to speak text');
-      setIsPlaying(false);
     } finally {
+      setIsPlaying(false);
+      setIsPaused(false);
       setIsLoading(false);
     }
   };
 
   const handlePause = async () => {
     if (isPaused) {
-      // Resume - will restart speech
-      await ttsService.resume();
+      // Resume
       setIsPaused(false);
       setIsPlaying(true);
-    } else {
+      await ttsService.resume();
+    } else if (isPlaying) {
       // Pause
-      await ttsService.pause();
-      setIsPaused(true);
       setIsPlaying(false);
+      setIsPaused(true);
+      await ttsService.pause();
     }
   };
 
   const handleStop = async () => {
-    await ttsService.stop();
     setIsPlaying(false);
     setIsPaused(false);
-  };
-
-  const handleSkipBackward = async () => {
-    await ttsService.skipBackward();
-  };
-
-  const handleSkipForward = async () => {
-    await ttsService.skipForward();
+    await ttsService.stop();
   };
 
   const handleSave = async () => {
@@ -137,7 +158,8 @@ export default function TTSScreen() {
     return seconds > 0 ? `~${seconds}s` : '~0s';
   };
 
-  const currentLang = getLanguage(language);
+  // Get current language from available languages (dynamic) or fallback to static
+  const currentLang = availableLanguages.find(l => l.id === language) || getLanguage(language);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -157,15 +179,18 @@ export default function TTSScreen() {
         >
           {/* Text Input Card */}
           <View style={styles.inputCard}>
-            <TextInput
-              style={styles.textInput}
-              placeholder="Type or paste your text here..."
-              placeholderTextColor="#9CA3AF"
-              value={text}
-              onChangeText={setText}
-              multiline
-              textAlignVertical="top"
-            />
+            <View style={styles.textInputContainer}>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Type or paste your text here..."
+                placeholderTextColor="#9CA3AF"
+                value={text}
+                onChangeText={setText}
+                multiline
+                textAlignVertical="top"
+              />
+            </View>
+            
             <View style={styles.inputFooter}>
               <Text style={styles.charCount}>{text.length} characters</Text>
               <Text style={styles.duration}>{estimateDuration()}</Text>
@@ -253,22 +278,16 @@ export default function TTSScreen() {
                 {text.substring(0, 50)}{text.length > 50 ? '...' : ''}
               </Text>
               <Text style={styles.playerSubtitle}>
-                {getLanguage(language)?.name}
+                {currentLang?.name || 'English'}
               </Text>
             </View>
             <View style={styles.playerControls}>
-              <TouchableOpacity style={styles.playerBtn} onPress={handleSkipBackward}>
-                <SkipBack size={22} color="#1F2937" />
-              </TouchableOpacity>
               <TouchableOpacity style={styles.playerMainBtn} onPress={handlePause}>
                 {isPaused ? (
                   <Play size={24} color="#FFFFFF" fill="#FFFFFF" />
                 ) : (
                   <Pause size={24} color="#FFFFFF" fill="#FFFFFF" />
                 )}
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.playerBtn} onPress={handleSkipForward}>
-                <SkipForward size={22} color="#1F2937" />
               </TouchableOpacity>
               <TouchableOpacity style={styles.playerStopBtn} onPress={handleStop}>
                 <Square size={18} color="#EF4444" fill="#EF4444" />
@@ -282,34 +301,65 @@ export default function TTSScreen() {
       <Modal
         visible={showLanguageModal}
         transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setShowLanguageModal(false)}
       >
-        <TouchableOpacity 
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowLanguageModal(false)}
-        >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity 
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setShowLanguageModal(false)}
+          />
           <View style={styles.modalContent}>
+            <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>Select Language</Text>
-            <FlatList
-              data={LANGUAGES}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.languageItem}
-                  onPress={() => handleLanguageSelect(item.id)}
-                >
-                  <Text style={styles.languageFlag}>{item.flag}</Text>
-                  <Text style={styles.languageName}>{item.name}</Text>
-                  {language === item.id && (
-                    <Check size={20} color="#2563EB" />
-                  )}
-                </TouchableOpacity>
-              )}
-            />
+            
+            {loadingLanguages ? (
+              <View style={{ padding: 32, alignItems: 'center' }}>
+                <Text style={{ color: '#6B7280' }}>Loading languages...</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={availableLanguages}
+                keyExtractor={(item) => item.id}
+                style={{ maxHeight: 400 }}
+                showsVerticalScrollIndicator={true}
+                ListHeaderComponent={
+                  availableLanguages.filter(l => l.isPriority).length > 0 ? (
+                    <Text style={styles.modalSectionTitle}>RECOMMENDED</Text>
+                  ) : null
+                }
+                renderItem={({ item, index }) => {
+                  const isFirstOther = !item.isPriority && 
+                    (index === 0 || availableLanguages[index - 1]?.isPriority);
+                  return (
+                    <>
+                      {isFirstOther && (
+                        <Text style={[styles.modalSectionTitle, { marginTop: 16 }]}>OTHER LANGUAGES</Text>
+                      )}
+                      <TouchableOpacity
+                        style={[
+                          styles.languageItem,
+                          language === item.id && styles.languageItemSelected
+                        ]}
+                        onPress={() => handleLanguageSelect(item.id)}
+                      >
+                        <Text style={styles.languageFlag}>{item.flag}</Text>
+                        <Text style={[
+                          styles.languageName,
+                          language === item.id && styles.languageNameSelected
+                        ]}>{item.name}</Text>
+                        {language === item.id && (
+                          <Check size={20} color="#2563EB" />
+                        )}
+                      </TouchableOpacity>
+                    </>
+                  );
+                }}
+              />
+            )}
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
     </View>
   );
@@ -359,6 +409,9 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     marginBottom: 24,
+  },
+  textInputContainer: {
+    position: 'relative',
   },
   textInput: {
     fontSize: 16,
@@ -504,17 +557,27 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
+    justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    flex: 1,
   },
   modalContent: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
-    width: '100%',
-    maxWidth: 340,
-    maxHeight: 400,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingBottom: 34,
+    maxHeight: '70%',
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#D1D5DB',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 16,
   },
   modalTitle: {
     fontSize: 18,
@@ -527,9 +590,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 14,
-    paddingHorizontal: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    marginBottom: 4,
+  },
+  languageItemSelected: {
+    backgroundColor: '#EFF6FF',
   },
   languageFlag: {
     fontSize: 24,
@@ -540,6 +606,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'SF-Pro-Regular',
     color: '#1F2937',
+  },
+  languageNameSelected: {
+    fontFamily: 'SF-Pro-Medium',
+    color: '#2563EB',
+  },
+  modalSectionTitle: {
+    fontSize: 12,
+    fontFamily: 'SF-Pro-Medium',
+    color: '#6B7280',
+    letterSpacing: 0.5,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   // Sticky Player Styles
   stickyPlayer: {
@@ -578,14 +656,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 16,
     paddingBottom: 8,
-  },
-  playerBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   playerMainBtn: {
     width: 56,

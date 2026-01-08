@@ -117,8 +117,8 @@ export default function SettingsScreen() {
     }
   };
 
-  const toggleLanguage = (lang) => {
-    setExpandedLang(expandedLang === lang ? null : lang);
+  const toggleLanguage = (langCode) => {
+    setExpandedLang(expandedLang === langCode ? null : langCode);
   };
 
   const renderVoiceItem = (voice, langKey) => {
@@ -133,14 +133,16 @@ export default function SettingsScreen() {
         <View style={styles.voiceInfo}>
           <View style={styles.voiceNameRow}>
             <Text style={[styles.voiceName, isSelected && styles.voiceNameSelected]} numberOfLines={1}>
-              {voice.name}
+              {voice.displayName || voice.name}
             </Text>
             {isSelected && <Check size={16} color="#2563EB" style={{ marginLeft: 8 }} />}
           </View>
           <Text style={styles.voiceDetails}>
-            {voice.gender ? voice.gender : 'Voice'} 
+            {voice.quality ? `${voice.quality} quality` : 'Voice'} 
           </Text>
-          <Text style={styles.voiceId} numberOfLines={1}>{voice.id}</Text>
+          {voice.technicalName && (
+            <Text style={styles.voiceId} numberOfLines={1}>{voice.technicalName}</Text>
+          )}
         </View>
         <TouchableOpacity 
           style={styles.testButton}
@@ -163,17 +165,24 @@ export default function SettingsScreen() {
   const renderLanguageGroup = ({ item }) => {
     const currentVoice = selectedVoices[item.langKey];
     const selectedVoiceName = currentVoice 
-      ? item.voices.find(v => v.id === currentVoice)?.name || 'Selected'
+      ? item.voices.find(v => v.id === currentVoice)?.displayName || 
+        item.voices.find(v => v.id === currentVoice)?.name || 
+        'Selected'
       : 'Auto';
     
+    const isExpanded = expandedLang === item.langCode;
+    
     return (
-      <View style={styles.langGroup}>
+      <View style={[styles.langGroup, isExpanded && styles.langGroupExpanded]}>
         <TouchableOpacity 
           style={styles.langHeader}
-          onPress={() => toggleLanguage(item.language)}
+          onPress={() => toggleLanguage(item.langCode)}
         >
           <View style={styles.langInfo}>
-            <Text style={styles.langName}>{item.language}</Text>
+            <View style={styles.langNameRow}>
+              <Text style={styles.langFlag}>{item.flag || '🌐'}</Text>
+              <Text style={styles.langName}>{item.language}</Text>
+            </View>
             <Text style={styles.langCount}>
               {item.count} voice{item.count !== 1 ? 's' : ''} • Using: {selectedVoiceName}
             </Text>
@@ -181,11 +190,11 @@ export default function SettingsScreen() {
           <ChevronRight 
             size={20} 
             color="#9CA3AF" 
-            style={{ transform: [{ rotate: expandedLang === item.language ? '90deg' : '0deg' }] }}
+            style={{ transform: [{ rotate: isExpanded ? '90deg' : '0deg' }] }}
           />
         </TouchableOpacity>
         
-        {expandedLang === item.language && (
+        {isExpanded && (
           <View style={styles.voiceList}>
             {/* Auto option */}
             <TouchableOpacity 
@@ -348,7 +357,7 @@ export default function SettingsScreen() {
             <>
               <View style={styles.voiceSummary}>
                 <Text style={styles.summaryText}>
-                  Found {voiceData.totalVoices} voice{voiceData.totalVoices !== 1 ? 's' : ''} for US, UK & Filipino
+                  Found {voiceData.totalVoices} voice{voiceData.totalVoices !== 1 ? 's' : ''} in {voiceData.languages.length} languages
                 </Text>
                 <Text style={styles.summaryHint}>
                   Tap ▶ to test • Tap a voice to select it
@@ -357,7 +366,7 @@ export default function SettingsScreen() {
               <FlatList
                 data={voiceData.languages}
                 renderItem={renderLanguageGroup}
-                keyExtractor={(item) => item.language}
+                keyExtractor={(item) => item.langCode}
                 contentContainerStyle={styles.voiceListContainer}
                 showsVerticalScrollIndicator={false}
               />
@@ -550,6 +559,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 12,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  langGroupExpanded: {
+    borderColor: '#2563EB',
+    borderWidth: 2,
   },
   langHeader: {
     flexDirection: 'row',
@@ -560,6 +575,14 @@ const styles = StyleSheet.create({
   },
   langInfo: {
     flex: 1,
+  },
+  langNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  langFlag: {
+    fontSize: 20,
+    marginRight: 10,
   },
   langName: {
     fontSize: 16,

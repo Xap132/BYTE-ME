@@ -1,27 +1,22 @@
 import Card from '@/components/ui/base/Card';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 /**
  * Language Selector Feature Component
- * Select TTS language
+ * Select TTS language with dynamic detection
+ * Priority languages (US, UK, Filipino) shown first, then others
  */
 export const LanguageSelector = ({ 
   selectedLanguage, 
   onLanguageChange,
-  languages = [
-    { id: 'en', label: 'English' },
-    { id: 'es', label: 'Spanish' },
-    { id: 'fr', label: 'French' },
-    { id: 'de', label: 'German' },
-    { id: 'it', label: 'Italian' },
-    { id: 'pt', label: 'Portuguese' },
-    { id: 'ja', label: 'Japanese' },
-    { id: 'ko', label: 'Korean' },
-    { id: 'zh', label: 'Mandarin' },
-    { id: 'fil', label: 'Filipino' },
-  ],
+  languages = [],
+  loading = false,
 }) => {
+  // Separate priority and other languages
+  const priorityLanguages = languages.filter(lang => lang.isPriority);
+  const otherLanguages = languages.filter(lang => !lang.isPriority);
+
   const styles = StyleSheet.create({
     container: {
       marginVertical: 12,
@@ -29,13 +24,20 @@ export const LanguageSelector = ({
     header: {
       marginBottom: 12,
     },
+    sectionTitle: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: '#6B7280',
+      fontFamily: 'Inter',
+      marginTop: 12,
+      marginBottom: 8,
+    },
     languageGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
       gap: 8,
     },
     languageButton: {
-      flex: 1,
       minWidth: '48%',
       paddingVertical: 12,
       paddingHorizontal: 16,
@@ -43,6 +45,7 @@ export const LanguageSelector = ({
       borderWidth: 2,
       alignItems: 'center',
       justifyContent: 'center',
+      flexDirection: 'row',
     },
     languageButtonActive: {
       backgroundColor: '#6366F1',
@@ -56,6 +59,7 @@ export const LanguageSelector = ({
       fontSize: 14,
       fontWeight: '600',
       fontFamily: 'Inter',
+      marginLeft: 6,
     },
     languageTextActive: {
       color: '#FFFFFF',
@@ -63,38 +67,110 @@ export const LanguageSelector = ({
     languageTextInactive: {
       color: '#4B5563',
     },
+    loadingText: {
+      fontSize: 14,
+      color: '#6B7280',
+      textAlign: 'center',
+      paddingVertical: 16,
+    },
+    emptyText: {
+      fontSize: 14,
+      color: '#9CA3AF',
+      textAlign: 'center',
+      paddingVertical: 16,
+      fontStyle: 'italic',
+    },
   });
+
+  if (loading) {
+    return (
+      <Card style={styles.container}>
+        <View style={styles.header}>
+          <Text style={{ fontSize: 16, fontWeight: '600', color: '#1F2937' }}>Language</Text>
+        </View>
+        <Text style={styles.loadingText}>Loading available languages...</Text>
+      </Card>
+    );
+  }
 
   return (
     <Card style={styles.container}>
       <View style={styles.header}>
         <Text style={{ fontSize: 16, fontWeight: '600', color: '#1F2937' }}>Language</Text>
       </View>
-      <View style={styles.languageGrid}>
-        {languages.map((lang) => (
-          <TouchableOpacity
-            key={lang.id}
-            style={[
-              styles.languageButton,
-              selectedLanguage === lang.id
-                ? styles.languageButtonActive
-                : styles.languageButtonInactive,
-            ]}
-            onPress={() => onLanguageChange(lang.id)}
-          >
-            <Text
+      
+      {/* Priority Languages */}
+      {priorityLanguages.length > 0 && (
+        <View style={styles.languageGrid}>
+          {priorityLanguages.map((lang) => (
+            <TouchableOpacity
+              key={lang.id}
               style={[
-                styles.languageText,
+                styles.languageButton,
                 selectedLanguage === lang.id
-                  ? styles.languageTextActive
-                  : styles.languageTextInactive,
+                  ? styles.languageButtonActive
+                  : styles.languageButtonInactive,
               ]}
+              onPress={() => onLanguageChange(lang.id)}
             >
-              {lang.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+              <Text style={{ fontSize: 18 }}>{lang.flag}</Text>
+              <Text
+                style={[
+                  styles.languageText,
+                  selectedLanguage === lang.id
+                    ? styles.languageTextActive
+                    : styles.languageTextInactive,
+                ]}
+              >
+                {lang.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
+      {/* Other Languages Section */}
+      {otherLanguages.length > 0 && (
+        <>
+          <Text style={styles.sectionTitle}>OTHER LANGUAGES</Text>
+          <ScrollView 
+            style={{ maxHeight: 200 }}
+            showsVerticalScrollIndicator={true}
+          >
+            <View style={styles.languageGrid}>
+              {otherLanguages.map((lang) => (
+                <TouchableOpacity
+                  key={lang.id}
+                  style={[
+                    styles.languageButton,
+                    selectedLanguage === lang.id
+                      ? styles.languageButtonActive
+                      : styles.languageButtonInactive,
+                  ]}
+                  onPress={() => onLanguageChange(lang.id)}
+                >
+                  <Text style={{ fontSize: 18 }}>{lang.flag}</Text>
+                  <Text
+                    style={[
+                      styles.languageText,
+                      selectedLanguage === lang.id
+                        ? styles.languageTextActive
+                        : styles.languageTextInactive,
+                    ]}
+                  >
+                    {lang.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+        </>
+      )}
+
+      {/* No languages available */}
+      {languages.length === 0 && (
+        <Text style={styles.emptyText}>No languages available</Text>
+      )}
     </Card>
   );
 };
