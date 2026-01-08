@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
-import { Play, Save, ChevronDown, Check } from 'lucide-react-native';
+import { Play, Pause, Save, ChevronDown, Check, SkipBack, SkipForward, Square } from 'lucide-react-native';
 import { ttsService } from '@/services/ttsService';
 import { audioManager } from '@/services/audioManager';
 import { storageService } from '@/services/storageService';
@@ -29,6 +29,8 @@ export default function TTSScreen() {
   const [speed, setSpeed] = useState(DEFAULT_SETTINGS.speed);
   const [isLoading, setIsLoading] = useState(false);
   const [showLanguageModal, setShowLanguageModal] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
 
   useEffect(() => {
     loadPreferences();
@@ -54,13 +56,41 @@ export default function TTSScreen() {
 
     try {
       setIsLoading(true);
+      setIsPlaying(true);
+      setIsPaused(false);
       await ttsService.speak({ text, language, voice, pitch, speed });
+      setIsPlaying(false);
     } catch (error) {
       console.error('TTS Error:', error);
       Alert.alert('Error', 'Failed to speak text');
+      setIsPlaying(false);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handlePause = async () => {
+    if (isPaused) {
+      await ttsService.resume();
+      setIsPaused(false);
+    } else {
+      await ttsService.pause();
+      setIsPaused(true);
+    }
+  };
+
+  const handleStop = async () => {
+    await ttsService.stop();
+    setIsPlaying(false);
+    setIsPaused(false);
+  };
+
+  const handleSkipBackward = async () => {
+    await ttsService.skipBackward();
+  };
+
+  const handleSkipForward = async () => {
+    await ttsService.skipForward();
   };
 
   const handleSave = async () => {
@@ -228,7 +258,7 @@ export default function TTSScreen() {
             <TouchableOpacity
               style={[styles.playButton, isLoading && styles.buttonDisabled]}
               onPress={handlePlay}
-              disabled={isLoading}
+              disabled={isLoading || isPlaying}
             >
               <Play size={18} color="#FFFFFF" fill="#FFFFFF" />
               <Text style={styles.playButtonText}>Play</Text>
@@ -244,6 +274,38 @@ export default function TTSScreen() {
             </TouchableOpacity>
           </View>
         </ScrollView>
+
+        {/* Sticky Playback Controls */}
+        {isPlaying && (
+          <View style={[styles.stickyPlayer, { paddingBottom: insets.bottom + 70 }]}>
+            <View style={styles.playerInfo}>
+              <Text style={styles.playerTitle} numberOfLines={1}>
+                {text.substring(0, 50)}{text.length > 50 ? '...' : ''}
+              </Text>
+              <Text style={styles.playerSubtitle}>
+                {getLanguage(language)?.name} • {voice === 'male' ? 'Male' : 'Female'}
+              </Text>
+            </View>
+            <View style={styles.playerControls}>
+              <TouchableOpacity style={styles.playerBtn} onPress={handleSkipBackward}>
+                <SkipBack size={22} color="#1F2937" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.playerMainBtn} onPress={handlePause}>
+                {isPaused ? (
+                  <Play size={24} color="#FFFFFF" fill="#FFFFFF" />
+                ) : (
+                  <Pause size={24} color="#FFFFFF" fill="#FFFFFF" />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.playerBtn} onPress={handleSkipForward}>
+                <SkipForward size={22} color="#1F2937" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.playerStopBtn} onPress={handleStop}>
+                <Square size={18} color="#EF4444" fill="#EF4444" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
       </KeyboardAvoidingView>
 
       {/* Language Selection Modal */}
@@ -494,5 +556,67 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'SF-Pro-Regular',
     color: '#1F2937',
+  },
+  // Sticky Player Styles
+  stickyPlayer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    paddingTop: 12,
+    paddingHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  playerInfo: {
+    marginBottom: 12,
+  },
+  playerTitle: {
+    fontSize: 14,
+    fontFamily: 'SF-Pro-Medium',
+    color: '#1F2937',
+    marginBottom: 2,
+  },
+  playerSubtitle: {
+    fontSize: 12,
+    fontFamily: 'SF-Pro-Regular',
+    color: '#6B7280',
+  },
+  playerControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+    paddingBottom: 8,
+  },
+  playerBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playerMainBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#2563EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playerStopBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
