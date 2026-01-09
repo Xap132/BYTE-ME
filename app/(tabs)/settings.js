@@ -1,0 +1,579 @@
+import { storageService } from '@/services/storageService';
+import { ttsService } from '@/services/ttsService';
+import { Check, ChevronRight, Play, Volume2, X } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+export default function SettingsScreen() {
+  const insets = useSafeAreaInsets();
+  const [darkMode, setDarkMode] = useState(false);
+
+  // Voice browser state
+  const [showVoiceModal, setShowVoiceModal] = useState(false);
+  const [voiceData, setVoiceData] = useState(null);
+  const [loadingVoices, setLoadingVoices] = useState(false);
+  const [expandedLang, setExpandedLang] = useState(null);
+  const [testingVoice, setTestingVoice] = useState(null);
+  const [selectedVoices, setSelectedVoices] = useState({
+    voiceUS: null,
+    voiceUK: null,
+    voiceFil: null,
+  });
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    try {
+      const prefs = await storageService.loadPreferences();
+      if (prefs.darkMode !== undefined) setDarkMode(prefs.darkMode);
+    } catch (error) {
+      console.error('Error loading settings:', error);
+    }
+  };
+
+  const handleToggle = async (key, value, setter) => {
+    setter(value);
+    try {
+      const prefs = await storageService.loadPreferences();
+      await storageService.savePreferences({ ...prefs, [key]: value });
+    } catch (error) {
+      console.error('Error saving setting:', error);
+    }
+  };
+
+  const handleOpenVoiceBrowser = async () => {
+    setShowVoiceModal(true);
+    setLoadingVoices(true);
+    try {
+      const [data, prefs] = await Promise.all([
+        ttsService.getAvailableVoices(),
+        ttsService.getVoicePreferences(),
+      ]);
+      setVoiceData(data);
+      setSelectedVoices(prefs);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to load voices');
+    } finally {
+      setLoadingVoices(false);
+    }
+  };
+
+  const handleTestVoice = async (voiceId, language) => {
+    setTestingVoice(voiceId);
+    try {
+      await ttsService.testVoice(voiceId, language);
+    } catch (error) {
+      console.error('Error testing voice:', error);
+    } finally {
+      setTestingVoice(null);
+    }
+  };
+
+  const handleSelectVoice = async (langKey, voiceId) => {
+    const success = await ttsService.setVoicePreference(langKey, voiceId);
+    if (success) {
+      setSelectedVoices(prev => ({ ...prev, [langKey]: voiceId }));
+    }
+  };
+
+  const toggleLanguage = (langCode) => {
+    setExpandedLang(expandedLang === langCode ? null : langCode);
+  };
+
+  const renderVoiceItem = (voice, langKey) => {
+    const isSelected = selectedVoices[langKey] === voice.id;
+
+    return (
+      <TouchableOpacity
+        key={voice.id}
+        style={[styles.voiceItem, isSelected && styles.voiceItemSelected]}
+        onPress={() => handleSelectVoice(langKey, voice.id)}
+      >
+        <View style={styles.voiceInfo}>
+          <View style={styles.voiceNameRow}>
+            <Text style={[styles.voiceName, isSelected && styles.voiceNameSelected]} numberOfLines={1}>
+              {voice.displayName || voice.name}
+            </Text>
+            {isSelected && <Check size={16} color="#2563EB" style={{ marginLeft: 8 }} />}
+          </View>
+          <Text style={styles.voiceDetails}>
+            {voice.quality ? `${voice.quality} quality` : 'Voice'}
+          </Text>
+          {voice.technicalName && (
+            <Text style={styles.voiceId} numberOfLines={1}>{voice.technicalName}</Text>
+          )}
+        </View>
+        <TouchableOpacity
+          style={styles.testButton}
+          onPress={(e) => {
+            e.stopPropagation();
+            handleTestVoice(voice.id, voice.language);
+          }}
+          disabled={testingVoice === voice.id}
+        >
+          {testingVoice === voice.id ? (
+            <ActivityIndicator size="small" color="#2563EB" />
+          ) : (
+            <Play size={16} color="#2563EB" fill="#2563EB" />
+          )}
+        </TouchableOpacity>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderLanguageGroup = ({ item }) => {
+    const currentVoice = selectedVoices[item.langKey];
+    // Default to "Voice A" (first voice) when no specific voice is selected
+    const selectedVoiceName = currentVoice
+      ? item.voices.find(v => v.id === currentVoice)?.displayName ||
+      item.voices.find(v => v.id === currentVoice)?.name ||
+      'Selected'
+      : item.voices[0]?.displayName || 'Voice A';
+
+    const isExpanded = expandedLang === item.langCode;
+
+    return (
+      <View style={[styles.langGroup, isExpanded && styles.langGroupExpanded]}>
+        <TouchableOpacity
+          style={styles.langHeader}
+          onPress={() => toggleLanguage(item.langCode)}
+        >
+          <View style={styles.langInfo}>
+            <View style={styles.langNameRow}>
+              <Text style={styles.langFlag}>{item.flag || '🌐'}</Text>
+              <Text style={styles.langName}>{item.language}</Text>
+            </View>
+            <Text style={styles.langCount}>
+              {item.count} voice{item.count !== 1 ? 's' : ''} • Using: {selectedVoiceName}
+            </Text>
+          </View>
+          <ChevronRight
+            size={20}
+            color="#9CA3AF"
+            style={{ transform: [{ rotate: isExpanded ? '90deg' : '0deg' }] }}
+          />
+        </TouchableOpacity>
+
+        {isExpanded && (
+          <View style={styles.voiceList}>
+            {item.voices.map(voice => renderVoiceItem(voice, item.langKey))}
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  return (
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.title}>Settings</Text>
+      </View>
+
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Preferences Section */}
+        <Text style={styles.sectionLabel}>PREFERENCES</Text>
+        <View style={styles.section}>
+          <View style={styles.settingItem}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingTitle}>Dark Mode</Text>
+              <Text style={styles.settingDesc}>Enable dark theme</Text>
+            </View>
+            <Switch
+              value={darkMode}
+              onValueChange={(val) => handleToggle('darkMode', val, setDarkMode)}
+              trackColor={{ false: '#E5E7EB', true: '#93C5FD' }}
+              thumbColor={darkMode ? '#2563EB' : '#FFFFFF'}
+            />
+          </View>
+
+          <View style={styles.divider} />
+
+          <TouchableOpacity style={styles.actionItem} onPress={handleOpenVoiceBrowser}>
+            <View style={styles.actionLeft}>
+              <View style={[styles.actionIconContainer, { backgroundColor: '#DBEAFE' }]}>
+                <Volume2 size={18} color="#2563EB" />
+              </View>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingTitle}>Voice Library</Text>
+                <Text style={styles.settingDesc}>Browse available TTS voices</Text>
+              </View>
+            </View>
+            <ChevronRight size={20} color="#9CA3AF" />
+          </TouchableOpacity>
+        </View>
+
+        {/* TTS Info Section */}
+        <Text style={styles.sectionLabel}>TEXT-TO-SPEECH INFO</Text>
+        <View style={styles.section}>
+          <View style={styles.infoItem}>
+            <Text style={styles.infoText}>
+              Available voices and languages depend on your device's installed TTS engines. Different devices may have different voice options.
+            </Text>
+          </View>
+        </View>
+
+
+
+        {/* About Section */}
+        <Text style={styles.sectionLabel}>ABOUT</Text>
+        <View style={styles.section}>
+          <View style={styles.aboutItem}>
+            <Text style={styles.aboutLabel}>Version</Text>
+            <Text style={styles.aboutValue}>1.0.0</Text>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.aboutItem}>
+            <Text style={styles.aboutLabel}>Developer</Text>
+
+            <Text style={styles.aboutValue}>BYTE-ME GROUP</Text>
+          </View>
+        </View>
+
+        {/* Footer */}
+        <Text style={styles.footer}>BSCS 3-1 for DCIT 26 - BYTE-ME</Text>
+        <Text style={styles.footer}>MARVELOUS GONZALES{"\n"}LYZETTE DOMINUGES{"\n"}HONEY GRAVE AQUINO</Text>
+      </ScrollView>
+
+      {/* Voice Browser Modal */}
+      <Modal
+        visible={showVoiceModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowVoiceModal(false)}
+      >
+        <View style={[styles.modalContainer, { paddingTop: insets.top }]}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Voice Library</Text>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowVoiceModal(false)}
+            >
+              <X size={24} color="#1F2937" />
+            </TouchableOpacity>
+          </View>
+
+          {loadingVoices ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#2563EB" />
+              <Text style={styles.loadingText}>Scanning voices...</Text>
+            </View>
+          ) : voiceData ? (
+            <>
+              <View style={styles.voiceSummary}>
+                <Text style={styles.summaryText}>
+                  Found {voiceData.totalVoices} voice{voiceData.totalVoices !== 1 ? 's' : ''} in {voiceData.languages.length} languages
+                </Text>
+                <Text style={styles.summaryHint}>
+                  Tap ▶ to test • Tap a voice to select it
+                </Text>
+              </View>
+              <FlatList
+                data={voiceData.languages}
+                renderItem={renderLanguageGroup}
+                keyExtractor={(item) => item.langCode}
+                contentContainerStyle={styles.voiceListContainer}
+                showsVerticalScrollIndicator={false}
+              />
+            </>
+          ) : (
+            <View style={styles.loadingContainer}>
+              <Text style={styles.loadingText}>No voices found</Text>
+            </View>
+          )}
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#101828',
+  },
+  header: {
+    paddingTop: 16,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  title: {
+    fontSize: 28,
+    fontFamily: 'SF-Pro-Bold',
+    color: '#FFFFFF',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 24,
+  },
+  sectionLabel: {
+    fontSize: 12,
+    fontFamily: 'SF-Pro-Medium',
+    color: '#9CA3AF',
+    letterSpacing: 0.5,
+    marginBottom: 12,
+    marginLeft: 4,
+  },
+  section: {
+    backgroundColor: '#1F2937',
+    borderRadius: 16,
+    marginBottom: 24,
+    overflow: 'hidden',
+  },
+  settingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  settingInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  settingTitle: {
+    fontSize: 16,
+    fontFamily: 'SF-Pro-Medium',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  settingDesc: {
+    fontSize: 13,
+    fontFamily: 'SF-Pro-Regular',
+    color: '#9CA3AF',
+  },
+  dangerText: {
+    color: '#EF4444',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#374151',
+    marginLeft: 16,
+  },
+  actionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  actionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  actionIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#374151',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  aboutItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  aboutLabel: {
+    fontSize: 16,
+    fontFamily: 'SF-Pro-Regular',
+    color: '#9CA3AF',
+  },
+  aboutValue: {
+    fontSize: 16,
+    fontFamily: 'SF-Pro-Medium',
+    color: '#FFFFFF',
+  },
+  footer: {
+    fontSize: 13,
+    fontFamily: 'SF-Pro-Regular',
+    color: '#6B7280',
+    textAlign: 'center',
+    marginTop: 12,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#101828',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#1F2937',
+    borderBottomWidth: 1,
+    borderBottomColor: '#374151',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontFamily: 'SF-Pro-Bold',
+    color: '#FFFFFF',
+  },
+  closeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#374151',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    fontFamily: 'SF-Pro-Regular',
+    color: '#9CA3AF',
+  },
+  voiceSummary: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#1F2937',
+  },
+  summaryText: {
+    fontSize: 15,
+    fontFamily: 'SF-Pro-Medium',
+    color: '#FFFFFF',
+  },
+  summaryHint: {
+    fontSize: 13,
+    fontFamily: 'SF-Pro-Regular',
+    color: '#9CA3AF',
+    marginTop: 4,
+  },
+  voiceListContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 40,
+  },
+  langGroup: {
+    backgroundColor: '#1F2937',
+    borderRadius: 16,
+    marginBottom: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#374151',
+  },
+  langGroupExpanded: {
+    borderColor: '#CD8546',
+    borderWidth: 2,
+  },
+  langHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  langInfo: {
+    flex: 1,
+  },
+  langNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  langFlag: {
+    fontSize: 20,
+    marginRight: 10,
+  },
+  langName: {
+    fontSize: 16,
+    fontFamily: 'SF-Pro-Medium',
+    color: '#FFFFFF',
+  },
+  langCount: {
+    fontSize: 13,
+    fontFamily: 'SF-Pro-Regular',
+    color: '#9CA3AF',
+    marginTop: 2,
+  },
+  voiceList: {
+    borderTopWidth: 1,
+    borderTopColor: '#374151',
+    paddingBottom: 8,
+  },
+  voiceItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  voiceItemSelected: {
+    backgroundColor: 'rgba(205, 133, 70, 0.1)',
+  },
+  voiceInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  voiceNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  voiceName: {
+    fontSize: 14,
+    fontFamily: 'SF-Pro-Medium',
+    color: '#FFFFFF',
+  },
+  voiceNameSelected: {
+    color: '#CD8546',
+  },
+  voiceDetails: {
+    fontSize: 12,
+    fontFamily: 'SF-Pro-Regular',
+    color: '#9CA3AF',
+    marginTop: 2,
+  },
+  voiceId: {
+    fontSize: 10,
+    fontFamily: 'SF-Pro-Regular',
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  testButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#374151',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoItem: {
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  infoText: {
+    fontSize: 14,
+    fontFamily: 'SF-Pro-Regular',
+    color: '#9CA3AF',
+    lineHeight: 20,
+  },
+});
