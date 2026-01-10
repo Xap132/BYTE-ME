@@ -1,6 +1,7 @@
 import { useTheme } from '@/contexts/ThemeContext';
+import { storageService } from '@/services/storageService';
 import { ttsService } from '@/services/ttsService';
-import { Check, ChevronRight, Play, Volume2, X } from 'lucide-react-native';
+import { Check, ChevronRight, Play, Trash2, Volume2, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -83,8 +84,33 @@ export default function SettingsScreen() {
     setExpandedLang(expandedLang === langCode ? null : langCode);
   };
 
+  const handleClearData = () => {
+    Alert.alert(
+      'Clear All Data',
+      'This will reset all your preferences, saved voices, and audio library. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await storageService.resetPreferences();
+              await storageService.clearAudioMetadata();
+              setSelectedVoices({ voiceUS: null, voiceUK: null, voiceFil: null });
+              Alert.alert('Done', 'All data has been cleared. Restart the app for changes to take full effect.');
+            } catch (error) {
+              console.error('Error clearing data:', error);
+              Alert.alert('Error', 'Failed to clear data');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   // Generate dynamic styles
-  const styles = getStyles(theme);
+  const styles = getStyles(theme, isDarkMode);
 
   const renderVoiceItem = (voice, langKey) => {
     const isSelected = selectedVoices[langKey] === voice.id;
@@ -211,6 +237,24 @@ export default function SettingsScreen() {
             </View>
             <ChevronRight size={20} color="#9CA3AF" />
           </TouchableOpacity>
+
+        </View>
+
+        {/* Data Section */}
+        <Text style={styles.sectionLabel}>DATA</Text>
+        <View style={styles.section}>
+          <TouchableOpacity style={styles.actionItem} onPress={handleClearData}>
+            <View style={styles.actionLeft}>
+              <View style={[styles.actionIconContainer, { backgroundColor: '#FEE2E2' }]}>
+                <Trash2 size={18} color="#DC2626" />
+              </View>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingTitle}>Clear All Data</Text>
+                <Text style={styles.settingDesc}>Reset preferences and saved audio</Text>
+              </View>
+            </View>
+            <ChevronRight size={20} color="#9CA3AF" />
+          </TouchableOpacity>
         </View>
 
         {/* TTS Info Section */}
@@ -297,7 +341,7 @@ export default function SettingsScreen() {
   );
 }
 
-const getStyles = (theme) => StyleSheet.create({
+const getStyles = (theme, isDarkMode) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.background,
@@ -431,7 +475,7 @@ const getStyles = (theme) => StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#374151',
+    backgroundColor: isDarkMode ? '#374151' : '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
   },

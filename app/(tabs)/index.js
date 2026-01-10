@@ -604,6 +604,7 @@ const getStyles = (theme, insets) => StyleSheet.create({
     fontFamily: 'SF-Pro-Regular',
     color: '#1F2937',
     flex: 1,
+    paddingBottom: 48, 
   },
   charCountContainer: {
     position: 'absolute',
@@ -617,7 +618,7 @@ const getStyles = (theme, insets) => StyleSheet.create({
   charCountText: {
     fontSize: 12,
     fontFamily: 'SF-Pro-Medium',
-    color: '#CD8546',
+    color: theme.charCountText || '#CD8546',
   },
   uploadContainer: {
     backgroundColor: theme.background,

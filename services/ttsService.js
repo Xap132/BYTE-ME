@@ -382,6 +382,7 @@ class TTSService {
 
   /**
    * Get user's selected voice for a language, or use first available (Voice A)
+   * Also saves the default voice if none was previously selected
    */
   async _getVoiceForLanguage(langCode, prefKey) {
     try {
@@ -391,8 +392,16 @@ class TTSService {
       // Get all available voices first
       const voices = await Speech.getAvailableVoicesAsync();
       
+      // Helper to check if voice identifier is valid
+      const isValidVoiceId = (id) => {
+        if (!id || typeof id !== 'string') return false;
+        // Filter out malformed identifiers that end with -language, -voice, etc.
+        if (id.endsWith('-language') || id.endsWith('-voice')) return false;
+        return true;
+      };
+      
       // If user has a saved voice, validate it exists in available voices
-      if (userVoice) {
+      if (userVoice && isValidVoiceId(userVoice)) {
         const voiceExists = voices.some(v => v.identifier === userVoice);
         if (voiceExists) {
           console.log(`[TTS] Using user-selected voice: ${userVoice} for ${langCode}`);
@@ -401,14 +410,6 @@ class TTSService {
           console.log(`[TTS] User voice ${userVoice} not found, finding default`);
         }
       }
-      
-      // Helper to check if voice identifier is valid
-      const isValidVoiceId = (id) => {
-        if (!id || typeof id !== 'string') return false;
-        // Filter out malformed identifiers that end with -language, -voice, etc.
-        if (id.endsWith('-language') || id.endsWith('-voice')) return false;
-        return true;
-      };
       
       // Find voices matching this language (only with valid identifiers)
       // Try exact match first, then base language match
@@ -433,6 +434,19 @@ class TTSService {
       const firstVoice = matchingVoices[0];
       if (firstVoice && firstVoice.identifier) {
         console.log(`[TTS] Using default Voice A: ${firstVoice.identifier} for ${langCode}`);
+        
+        // Auto-save this as the default voice for this language so it's used next time
+        try {
+          const currentPrefs = await storageService.loadPreferences();
+          if (!currentPrefs[prefKey]) {
+            currentPrefs[prefKey] = firstVoice.identifier;
+            await storageService.savePreferences(currentPrefs);
+            console.log(`[TTS] Auto-saved default voice: ${prefKey} = ${firstVoice.identifier}`);
+          }
+        } catch (saveErr) {
+          console.warn('[TTS] Could not auto-save voice preference:', saveErr);
+        }
+        
         return firstVoice.identifier;
       }
       
@@ -475,7 +489,8 @@ class TTSService {
     } else if (language.startsWith('lang_')) {
       // Dynamic language ID (e.g., 'lang_es_ES' -> 'es-ES')
       langCode = language.replace('lang_', '').replace(/_/g, '-');
-      prefKey = `voice_${langCode}`;
+      // Use underscores in prefKey to match what's saved in getAvailableVoices
+      prefKey = `voice_${langCode.replace(/[^a-zA-Z0-9]/g, '_')}`;
     } else {
       // Fallback to US English
       langCode = 'en-US';

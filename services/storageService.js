@@ -38,6 +38,19 @@ function migratePreferences(preferences) {
     else merged.defaultPresetLanguage = 'en_us_f';
   }
 
+  // Clean up any invalid voice IDs that may have been saved
+  // These are malformed IDs like "en-IN-language" that some devices return
+  Object.keys(merged).forEach(key => {
+    if (key.startsWith('voice') && merged[key]) {
+      const voiceId = merged[key];
+      if (typeof voiceId === 'string' && 
+          (voiceId.endsWith('-language') || voiceId.endsWith('-voice'))) {
+        console.log(`[Storage] Removing invalid voice ID: ${key} = ${voiceId}`);
+        delete merged[key];
+      }
+    }
+  });
+
   return merged;
 }
 
@@ -128,6 +141,19 @@ class StorageService {
     } catch (error) {
       console.error('Error loading audio metadata:', error);
       return [];
+    }
+  }
+
+  /**
+   * Clear audio metadata only
+   */
+  async clearAudioMetadata() {
+    try {
+      await AsyncStorage.removeItem(AUDIO_METADATA_KEY);
+      console.log('Audio metadata cleared');
+    } catch (error) {
+      console.error('Error clearing audio metadata:', error);
+      throw error;
     }
   }
 
