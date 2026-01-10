@@ -1,5 +1,5 @@
-import { Colors } from '@/constants/theme';
 import { DEFAULT_SETTINGS, getLanguage } from '@/constants/voices';
+import { useTheme } from '@/contexts/ThemeContext';
 import { audioManager } from '@/services/audioManager';
 import { storageService } from '@/services/storageService';
 import { ttsService } from '@/services/ttsService';
@@ -13,6 +13,7 @@ import {
   FileText,
   Pause,
   Play,
+  Save,
   Square,
   Upload
 } from 'lucide-react-native';
@@ -31,6 +32,7 @@ import {
   View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { TAB_BAR_HEIGHT } from './_layout';
 
 const MODES = {
   SELECTION: 'SELECTION',
@@ -40,6 +42,7 @@ const MODES = {
 
 export default function TTSScreen() {
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
   const [mode, setMode] = useState(MODES.SELECTION);
   const [text, setText] = useState('');
   const [language, setLanguage] = useState('en_us_f');
@@ -208,7 +211,8 @@ export default function TTSScreen() {
     stopSentenceHighlighting();
     setIsPlaying(false);
     setIsPaused(false);
-    setIsAudioReady(false);
+    // DON'T hide player - let user see it finished
+    // setIsAudioReady(false); // Removed - keep player visible
   };
 
   const handlePlay = async () => {
@@ -314,6 +318,9 @@ export default function TTSScreen() {
   };
 
   const currentLang = availableLanguages.find(l => l.id === language) || getLanguage(language);
+  
+  // Generate dynamic styles
+  const styles = getStyles(theme, insets);
 
   // Mode: SELECTION
   if (mode === MODES.SELECTION) {
@@ -325,16 +332,16 @@ export default function TTSScreen() {
         </View>
         <View style={styles.selectionGrid}>
           <TouchableOpacity
-            style={[styles.modeButton, { backgroundColor: Colors.techTalk.orangeBtn }]}
+            style={[styles.modeButton, { backgroundColor: theme.orangeBtn }]}
             onPress={() => { setText(''); setFileName(''); setMode(MODES.TEXT_INPUT); }}
           >
             <FileText size={48} color="#FFFFFF" strokeWidth={1.5} />
             <Text style={styles.modeButtonTitle}>Input Text</Text>
-            <Text style={styles.modeButtonSub}>Use text file from storage</Text>
+            <Text style={styles.modeButtonSub}>Input text manually</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.modeButton, { backgroundColor: Colors.techTalk.goldBtn }]}
+            style={[styles.modeButton, { backgroundColor: theme.goldBtn }]}
             onPress={() => { setText(''); setFileName(''); setMode(MODES.FILE_IMPORT); }}
           >
             <Upload size={48} color="#FFFFFF" strokeWidth={1.5} />
@@ -352,7 +359,7 @@ export default function TTSScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => { handleStop(); setText(''); setFileName(''); setMode(MODES.SELECTION); }}>
-            <ArrowLeft size={28} color={Colors.techTalk.orangeBtn} />
+            <ArrowLeft size={28} color={theme.orangeBtn} />
           </TouchableOpacity>
           <Text style={styles.modeTitle}>
             {mode === MODES.TEXT_INPUT ? 'Create Text-to-Speech' : 'Create File-to-Speech'}
@@ -365,7 +372,7 @@ export default function TTSScreen() {
             <TouchableOpacity style={styles.languageSelector} onPress={() => setShowLanguageModal(true)}>
               <Text style={styles.selectorFlag}>{currentLang?.flag || '🇺🇸'}</Text>
               <Text style={styles.selectorText}>{currentLang?.name || 'US'}</Text>
-              <ChevronDown size={20} color={Colors.techTalk.textSecondary} />
+              <ChevronDown size={20} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -374,16 +381,19 @@ export default function TTSScreen() {
               <TextInput
                 style={styles.textInput}
                 placeholder="Enter a text..."
-                placeholderTextColor="#6B7280"
+                placeholderTextColor={theme.placeholderText || '#9CA3AF'}
                 value={text}
                 onChangeText={setText}
                 multiline
                 textAlignVertical="top"
               />
+              <View style={styles.charCountContainer}>
+                <Text style={styles.charCountText}>{text.length} characters</Text>
+              </View>
             </View>
           ) : (
             <View style={styles.uploadContainer}>
-              <Upload size={48} color={Colors.techTalk.textSecondary} opacity={0.5} />
+              <Upload size={48} color={theme.textSecondary} opacity={0.5} />
               <Text style={styles.uploadTitle}>
                 {fileName ? 'File Loaded' : 'Upload Text File'}
               </Text>
@@ -400,11 +410,11 @@ export default function TTSScreen() {
 
           <View style={styles.playbackActions}>
             <TouchableOpacity style={styles.playBtn} onPress={handlePlay} disabled={isLoading}>
-              <Play size={32} color="#FFFFFF" fill="#FFFFFF" />
+              <Play size={18} color="#FFFFFF" fill="#FFFFFF" />
               <Text style={styles.actionBtnText}>Play</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={isLoading}>
-              <FileText size={32} color="#FFFFFF" />
+              <Save size={18} color="#FFFFFF" />
               <Text style={styles.actionBtnText}>Save</Text>
             </TouchableOpacity>
           </View>
@@ -420,9 +430,9 @@ export default function TTSScreen() {
               maximumValue={2.0}
               value={pitch}
               onValueChange={setPitch}
-              minimumTrackTintColor={Colors.techTalk.orangeBtn}
+              minimumTrackTintColor={theme.orangeBtn}
               maximumTrackTintColor="#1F2937"
-              thumbTintColor={Colors.techTalk.orangeBtn}
+              thumbTintColor={theme.orangeBtn}
             />
           </View>
 
@@ -437,9 +447,9 @@ export default function TTSScreen() {
               maximumValue={2.0}
               value={speed}
               onValueChange={setSpeed}
-              minimumTrackTintColor={Colors.techTalk.orangeBtn}
+              minimumTrackTintColor={theme.orangeBtn}
               maximumTrackTintColor="#1F2937"
-              thumbTintColor={Colors.techTalk.orangeBtn}
+              thumbTintColor={theme.orangeBtn}
             />
           </View>
         </ScrollView>
@@ -448,13 +458,14 @@ export default function TTSScreen() {
       <Modal visible={showLanguageModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setShowLanguageModal(false)} />
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { backgroundColor: theme.tabBarBg }]}>
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>Select Language</Text>
             <FlatList
               data={availableLanguages}
               keyExtractor={(item) => item.id}
               showsVerticalScrollIndicator={false}
+              style={{ maxHeight: 400 }}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={[styles.languageItem, language === item.id && styles.languageItemSelected]}
@@ -464,7 +475,7 @@ export default function TTSScreen() {
                   <Text style={[styles.languageName, language === item.id && styles.languageNameSelected]}>
                     {item.name}
                   </Text>
-                  {language === item.id && <Check size={20} color={Colors.techTalk.orangeBtn} />}
+                  {language === item.id && <Check size={20} color={theme.orangeBtn} />}
                 </TouchableOpacity>
               )}
             />
@@ -492,10 +503,10 @@ export default function TTSScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme, insets) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.techTalk.background,
+    backgroundColor: theme.background,
   },
   logoContainer: {
     alignItems: 'center',
@@ -505,13 +516,13 @@ const styles = StyleSheet.create({
   logoTech: {
     fontSize: 72,
     fontFamily: 'SF-Pro-Bold',
-    color: Colors.techTalk.orangeBtn,
+    color: theme.orangeBtn,
     lineHeight: 70,
   },
   logoTalk: {
     fontSize: 64,
     fontFamily: 'SF-Pro-Bold',
-    color: Colors.techTalk.goldBtn,
+    color: theme.goldBtn,
     marginLeft: 60,
     marginTop: -20,
   },
@@ -549,11 +560,11 @@ const styles = StyleSheet.create({
   modeTitle: {
     fontSize: 22,
     fontFamily: 'SF-Pro-Bold',
-    color: '#FFFFFF',
+    color: theme.text,
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingBottom: 120,
+    paddingBottom: TAB_BAR_HEIGHT + insets.bottom + 40,
   },
   section: {
     marginBottom: 20,
@@ -561,13 +572,13 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 16,
     fontFamily: 'SF-Pro-Medium',
-    color: Colors.techTalk.textSecondary,
+    color: theme.textSecondary,
     marginBottom: 10,
   },
   languageSelector: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1F2937',
+    backgroundColor: theme.tabBarBg,
     borderRadius: 12,
     padding: 14,
     gap: 10,
@@ -578,11 +589,11 @@ const styles = StyleSheet.create({
   selectorText: {
     flex: 1,
     fontSize: 18,
-    color: '#FFFFFF',
+    color: theme.text,
     fontFamily: 'SF-Pro-Medium',
   },
   inputContainer: {
-    backgroundColor: Colors.techTalk.inputBg,
+    backgroundColor: theme.inputBg,
     borderRadius: 24,
     padding: 16,
     height: 220,
@@ -592,13 +603,27 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: 'SF-Pro-Regular',
     color: '#1F2937',
-    height: '100%',
+    flex: 1,
+  },
+  charCountContainer: {
+    position: 'absolute',
+    bottom: 12,
+    right: 16,
+    backgroundColor: 'rgba(205, 133, 70, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  charCountText: {
+    fontSize: 12,
+    fontFamily: 'SF-Pro-Medium',
+    color: '#CD8546',
   },
   uploadContainer: {
-    backgroundColor: '#101828',
+    backgroundColor: theme.background,
     borderRadius: 24,
     borderWidth: 1.5,
-    borderColor: Colors.techTalk.textSecondary,
+    borderColor: theme.textSecondary,
     borderStyle: 'dashed',
     paddingVertical: 60,
     paddingHorizontal: 20,
@@ -608,13 +633,13 @@ const styles = StyleSheet.create({
   uploadTitle: {
     fontSize: 28,
     fontFamily: 'SF-Pro-Bold',
-    color: '#FFFFFF',
+    color: theme.text,
     marginTop: 16,
   },
   uploadSub: {
     fontSize: 16,
     fontFamily: 'SF-Pro-Regular',
-    color: Colors.techTalk.textSecondary,
+    color: theme.textSecondary,
     marginTop: 8,
     textAlign: 'center',
   },
@@ -632,31 +657,31 @@ const styles = StyleSheet.create({
   },
   playbackActions: {
     flexDirection: 'row',
-    gap: 16,
-    marginBottom: 30,
+    gap: 12,
+    marginBottom: 20,
   },
   playBtn: {
     flex: 1,
-    backgroundColor: '#374151',
-    borderRadius: 20,
-    paddingVertical: 20,
+    backgroundColor: theme.orangeBtn,
+    borderRadius: 16,
+    paddingVertical: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
+    gap: 8,
   },
   saveBtn: {
     flex: 1,
-    backgroundColor: '#374151',
-    borderRadius: 20,
-    paddingVertical: 20,
+    backgroundColor: theme.goldBtn,
+    borderRadius: 16,
+    paddingVertical: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
+    gap: 8,
   },
   actionBtnText: {
-    fontSize: 24,
+    fontSize: 16,
     fontFamily: 'SF-Pro-Bold',
     color: '#FFFFFF',
   },
@@ -670,12 +695,12 @@ const styles = StyleSheet.create({
   },
   sliderLabel: {
     fontSize: 16,
-    color: Colors.techTalk.textSecondary,
+    color: theme.textSecondary,
     fontFamily: 'SF-Pro-Medium',
   },
   sliderValue: {
     fontSize: 16,
-    color: '#FFFFFF',
+    color: theme.text,
     fontFamily: 'SF-Pro-Medium',
   },
   slider: {
@@ -691,7 +716,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   modalContent: {
-    backgroundColor: '#1F2937',
+    backgroundColor: theme.tabBarBg,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     paddingHorizontal: 20,
@@ -710,7 +735,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontFamily: 'SF-Pro-Bold',
-    color: '#FFFFFF',
+    color: theme.text,
     marginBottom: 20,
     textAlign: 'center',
   },
@@ -731,22 +756,25 @@ const styles = StyleSheet.create({
   languageName: {
     flex: 1,
     fontSize: 18,
-    color: '#FFFFFF',
+    color: theme.text,
     fontFamily: 'SF-Pro-Regular',
   },
   languageNameSelected: {
     fontFamily: 'SF-Pro-Bold',
-    color: Colors.techTalk.orangeBtn,
+    color: theme.orangeBtn,
   },
   stickyPlayer: {
     position: 'absolute',
-    bottom: 0,
+    bottom: TAB_BAR_HEIGHT + insets.bottom,
     left: 0,
     right: 0,
-    backgroundColor: '#1F2937',
+    backgroundColor: theme.tabBarBg,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
+    borderBottomWidth: 2,
+    borderBottomColor: theme.divider || 'rgba(255,255,255,0.1)',
     padding: 24,
+    paddingBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.3,
@@ -760,13 +788,13 @@ const styles = StyleSheet.create({
   playerTitle: {
     fontSize: 16,
     fontFamily: 'SF-Pro-Medium',
-    color: '#FFFFFF',
+    color: theme.text,
     marginBottom: 4,
   },
   playerSubtitle: {
     fontSize: 14,
     fontFamily: 'SF-Pro-Regular',
-    color: Colors.techTalk.textSecondary,
+    color: theme.textSecondary,
   },
   playerControls: {
     flexDirection: 'row',
@@ -778,7 +806,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: Colors.techTalk.orangeBtn,
+    backgroundColor: theme.orangeBtn,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -25,7 +25,7 @@ export const Colors = {
     tabIconDefault: '#9BA1A6',
     tabIconSelected: tintColorDark,
   },
-  // Custom Tech-Talk Palette
+  // Custom Tech-Talk Palette (Dark Mode)
   techTalk: {
     background: '#101828',
     tabBarBg: '#3C3C43',
@@ -35,6 +35,27 @@ export const Colors = {
     text: '#FFFFFF',
     textSecondary: '#D4D4D8',
     icon: '#FFFFFF',
+    placeholderText: '#A8A29E',
+    charCountBg: 'rgba(205, 133, 70, 0.15)',
+    charCountText: '#CD8546',
+    divider: 'rgba(255,255,255,0.1)',
+  },
+  // Light Mode with Orange Theme
+  techTalkLight: {
+    background: '#FFFFFF',
+    tabBarBg: '#F8F9FA',
+    orangeBtn: '#CD8546',
+    goldBtn: '#C2A070',
+    inputBg: '#FFF8F0',
+    text: '#1F2937',
+    textSecondary: '#6B7280',
+    icon: '#1F2937',
+    borderColor: '#E5E7EB',
+    cardBg: '#FFFFFF',
+    placeholderText: '#9CA3AF',
+    charCountBg: 'rgba(205, 133, 70, 0.1)',
+    charCountText: '#CD8546',
+    divider: 'rgba(0,0,0,0.08)',
   }
 };
 

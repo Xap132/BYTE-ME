@@ -1,3 +1,4 @@
+import { useTheme } from '@/contexts/ThemeContext';
 import { audioManager } from '@/services/audioManager';
 import { ttsService } from '@/services/ttsService';
 import Slider from '@react-native-community/slider';
@@ -18,9 +19,11 @@ import {
   View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { TAB_BAR_HEIGHT } from './_layout';
 
 export default function AudioLibraryScreen() {
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
   const [audioFiles, setAudioFiles] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [playingId, setPlayingId] = useState(null);
@@ -276,6 +279,9 @@ export default function AudioLibraryScreen() {
     );
   };
 
+  // Generate dynamic styles
+  const styles = getStyles(theme, insets);
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
@@ -322,7 +328,7 @@ export default function AudioLibraryScreen() {
           }}
         >
           <Pressable
-            style={[styles.nowPlayingBar, { paddingBottom: insets.bottom + 70 }]}
+            style={[styles.nowPlayingBar, { paddingBottom: TAB_BAR_HEIGHT + insets.bottom + 10 }]}
             onPress={(e) => e.stopPropagation()}
           >
             <View style={styles.nowPlayingHeader}>
@@ -395,7 +401,7 @@ export default function AudioLibraryScreen() {
               style={styles.optionItem}
               onPress={() => handleSaveToDevice(showOptions)}
             >
-              <Download size={20} color="#1F2937" />
+              <Download size={20} color={theme.text} />
               <Text style={styles.optionText}>Download Audio</Text>
             </TouchableOpacity>
 
@@ -420,10 +426,10 @@ export default function AudioLibraryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme, insets) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#101828',
+    backgroundColor: theme.background,
   },
   header: {
     paddingTop: 16,
@@ -433,11 +439,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontFamily: 'SF-Pro-Bold',
-    color: '#FFFFFF',
+    color: theme.text,
   },
   listContent: {
     paddingHorizontal: 20,
-    paddingBottom: 200,
+    paddingBottom: TAB_BAR_HEIGHT + insets.bottom + 20,
   },
   emptyList: {
     flex: 1,
@@ -460,13 +466,13 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#1F2937',
+    backgroundColor: theme.tabBarBg,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
   },
   playIconActive: {
-    backgroundColor: '#CD8546',
+    backgroundColor: theme.orangeBtn,
   },
   itemInfo: {
     flex: 1,
@@ -474,13 +480,13 @@ const styles = StyleSheet.create({
   itemTitle: {
     fontSize: 16,
     fontFamily: 'SF-Pro-Medium',
-    color: '#FFFFFF',
+    color: theme.text,
     marginBottom: 4,
   },
   itemSubtitle: {
     fontSize: 14,
     fontFamily: 'SF-Pro-Regular',
-    color: '#9CA3AF',
+    color: theme.textSecondary,
   },
   itemRight: {
     flexDirection: 'row',
@@ -497,7 +503,7 @@ const styles = StyleSheet.create({
   },
   separator: {
     height: 1,
-    backgroundColor: '#1F2937',
+    backgroundColor: theme.tabBarBg,
   },
   emptyState: {
     flex: 1,
@@ -509,7 +515,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#1F2937',
+    backgroundColor: theme.tabBarBg,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
@@ -517,7 +523,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontFamily: 'SF-Pro-Medium',
-    color: '#FFFFFF',
+    color: theme.text,
     marginBottom: 8,
   },
   emptyText: {
@@ -537,7 +543,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   nowPlayingBar: {
-    backgroundColor: '#1F2937',
+    backgroundColor: theme.tabBarBg,
     paddingTop: 16,
     paddingHorizontal: 20,
     borderTopLeftRadius: 30,
@@ -562,7 +568,7 @@ const styles = StyleSheet.create({
   nowPlayingTitle: {
     fontSize: 16,
     fontFamily: 'SF-Pro-Medium',
-    color: '#FFFFFF',
+    color: theme.text,
   },
   controlButtons: {
     flexDirection: 'row',
@@ -604,20 +610,22 @@ const styles = StyleSheet.create({
   },
   optionsOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
   optionsContent: {
-    backgroundColor: '#1F2937',
+    backgroundColor: theme.background,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     padding: 24,
     paddingBottom: 40,
+    borderTopWidth: 1,
+    borderTopColor: theme.divider || 'rgba(0,0,0,0.1)',
   },
   optionsTitle: {
     fontSize: 18,
     fontFamily: 'SF-Pro-Bold',
-    color: '#FFFFFF',
+    color: theme.text,
     textAlign: 'center',
     marginBottom: 24,
   },
@@ -626,7 +634,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 16,
     paddingHorizontal: 16,
-    backgroundColor: '#374151',
+    backgroundColor: theme.tabBarBg,
     borderRadius: 16,
     marginBottom: 12,
     gap: 12,
@@ -637,7 +645,7 @@ const styles = StyleSheet.create({
   optionText: {
     fontSize: 16,
     fontFamily: 'SF-Pro-Medium',
-    color: '#FFFFFF',
+    color: theme.text,
   },
   optionTextDanger: {
     color: '#EF4444',
@@ -650,6 +658,6 @@ const styles = StyleSheet.create({
   optionCancelText: {
     fontSize: 16,
     fontFamily: 'SF-Pro-Medium',
-    color: '#9CA3AF',
+    color: theme.textSecondary,
   },
 });

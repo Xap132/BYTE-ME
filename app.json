@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "TO-DO",
-    "slug": "TO-DO",
+    "name": "Tech Talk",
+    "slug": "tech-talk",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "todo",
+    "scheme": "techtalk",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -13,14 +13,14 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#101828",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.TODO"
+      "package": "com.byteme.techtalk"
     },
     "web": {
       "output": "static",

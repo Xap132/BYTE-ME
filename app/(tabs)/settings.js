@@ -1,4 +1,4 @@
-import { storageService } from '@/services/storageService';
+import { useTheme } from '@/contexts/ThemeContext';
 import { ttsService } from '@/services/ttsService';
 import { Check, ChevronRight, Play, Volume2, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
@@ -18,7 +18,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
-  const [darkMode, setDarkMode] = useState(false);
+  const { theme, isDarkMode, toggleTheme } = useTheme();
+  const [darkMode, setDarkMode] = useState(isDarkMode);
 
   // Voice browser state
   const [showVoiceModal, setShowVoiceModal] = useState(false);
@@ -33,25 +34,13 @@ export default function SettingsScreen() {
   });
 
   useEffect(() => {
-    loadSettings();
-  }, []);
-
-  const loadSettings = async () => {
-    try {
-      const prefs = await storageService.loadPreferences();
-      if (prefs.darkMode !== undefined) setDarkMode(prefs.darkMode);
-    } catch (error) {
-      console.error('Error loading settings:', error);
-    }
-  };
+    setDarkMode(isDarkMode);
+  }, [isDarkMode]);
 
   const handleToggle = async (key, value, setter) => {
     setter(value);
-    try {
-      const prefs = await storageService.loadPreferences();
-      await storageService.savePreferences({ ...prefs, [key]: value });
-    } catch (error) {
-      console.error('Error saving setting:', error);
+    if (key === 'darkMode') {
+      await toggleTheme(value);
     }
   };
 
@@ -93,6 +82,9 @@ export default function SettingsScreen() {
   const toggleLanguage = (langCode) => {
     setExpandedLang(expandedLang === langCode ? null : langCode);
   };
+
+  // Generate dynamic styles
+  const styles = getStyles(theme);
 
   const renderVoiceItem = (voice, langKey) => {
     const isSelected = selectedVoices[langKey] === voice.id;
@@ -244,12 +236,12 @@ export default function SettingsScreen() {
           <View style={styles.aboutItem}>
             <Text style={styles.aboutLabel}>Developer</Text>
 
-            <Text style={styles.aboutValue}>BYTE-ME GROUP</Text>
+            <Text style={styles.aboutValue}>BYTE-ME</Text>
           </View>
         </View>
 
         {/* Footer */}
-        <Text style={styles.footer}>BSCS 3-1 for DCIT 26 - BYTE-ME</Text>
+        <Text style={styles.footer}>BSCS 3-1 for DCIT 26 - Tech Talk</Text>
         <Text style={styles.footer}>MARVELOUS GONZALES{"\n"}LYZETTE DOMINUGES{"\n"}HONEY GRAVE AQUINO</Text>
       </ScrollView>
 
@@ -267,7 +259,7 @@ export default function SettingsScreen() {
               style={styles.closeButton}
               onPress={() => setShowVoiceModal(false)}
             >
-              <X size={24} color="#1F2937" />
+              <X size={24} color={theme.text} />
             </TouchableOpacity>
           </View>
 
@@ -305,10 +297,10 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#101828',
+    backgroundColor: theme.background,
   },
   header: {
     paddingTop: 16,
@@ -318,7 +310,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontFamily: 'SF-Pro-Bold',
-    color: '#FFFFFF',
+    color: theme.text,
   },
   scrollView: {
     flex: 1,
@@ -330,13 +322,13 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 12,
     fontFamily: 'SF-Pro-Medium',
-    color: '#9CA3AF',
+    color: theme.textSecondary,
     letterSpacing: 0.5,
     marginBottom: 12,
     marginLeft: 4,
   },
   section: {
-    backgroundColor: '#1F2937',
+    backgroundColor: theme.tabBarBg,
     borderRadius: 16,
     marginBottom: 24,
     overflow: 'hidden',
@@ -355,13 +347,13 @@ const styles = StyleSheet.create({
   settingTitle: {
     fontSize: 16,
     fontFamily: 'SF-Pro-Medium',
-    color: '#FFFFFF',
+    color: theme.text,
     marginBottom: 4,
   },
   settingDesc: {
     fontSize: 13,
     fontFamily: 'SF-Pro-Regular',
-    color: '#9CA3AF',
+    color: theme.textSecondary,
   },
   dangerText: {
     color: '#EF4444',
@@ -402,12 +394,12 @@ const styles = StyleSheet.create({
   aboutLabel: {
     fontSize: 16,
     fontFamily: 'SF-Pro-Regular',
-    color: '#9CA3AF',
+    color: theme.textSecondary,
   },
   aboutValue: {
     fontSize: 16,
     fontFamily: 'SF-Pro-Medium',
-    color: '#FFFFFF',
+    color: theme.text,
   },
   footer: {
     fontSize: 13,
@@ -418,7 +410,7 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: '#101828',
+    backgroundColor: theme.background,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -426,14 +418,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#1F2937',
+    backgroundColor: theme.tabBarBg,
     borderBottomWidth: 1,
-    borderBottomColor: '#374151',
+    borderBottomColor: theme.borderColor || '#374151',
   },
   modalTitle: {
     fontSize: 20,
     fontFamily: 'SF-Pro-Bold',
-    color: '#FFFFFF',
+    color: theme.text,
   },
   closeButton: {
     width: 40,
@@ -457,12 +449,12 @@ const styles = StyleSheet.create({
   voiceSummary: {
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#1F2937',
+    backgroundColor: theme.tabBarBg,
   },
   summaryText: {
     fontSize: 15,
     fontFamily: 'SF-Pro-Medium',
-    color: '#FFFFFF',
+    color: theme.text,
   },
   summaryHint: {
     fontSize: 13,
@@ -476,15 +468,15 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   langGroup: {
-    backgroundColor: '#1F2937',
+    backgroundColor: theme.tabBarBg,
     borderRadius: 16,
     marginBottom: 12,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: theme.borderColor || '#374151',
   },
   langGroupExpanded: {
-    borderColor: '#CD8546',
+    borderColor: theme.orangeBtn,
     borderWidth: 2,
   },
   langHeader: {
@@ -508,7 +500,7 @@ const styles = StyleSheet.create({
   langName: {
     fontSize: 16,
     fontFamily: 'SF-Pro-Medium',
-    color: '#FFFFFF',
+    color: theme.text,
   },
   langCount: {
     fontSize: 13,
@@ -541,10 +533,10 @@ const styles = StyleSheet.create({
   voiceName: {
     fontSize: 14,
     fontFamily: 'SF-Pro-Medium',
-    color: '#FFFFFF',
+    color: theme.text,
   },
   voiceNameSelected: {
-    color: '#CD8546',
+    color: theme.orangeBtn,
   },
   voiceDetails: {
     fontSize: 12,
