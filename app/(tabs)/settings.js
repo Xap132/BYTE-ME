@@ -286,7 +286,7 @@ export default function SettingsScreen() {
 
         {/* Footer */}
         <Text style={styles.footer}>BSCS 3-1 for DCIT 26 - Tech Talk</Text>
-        <Text style={styles.footer}>MARVELOUS GONZALES{"\n"}LYZETTE DOMINUGES{"\n"}HONEY GRAVE AQUINO</Text>
+        <Text style={styles.footer}>MARVELOUS GONZALES{"\n"}LYZETTE DOMINUGEZ {"\n"}HONEY GRACE AQUINO</Text>
       </ScrollView>
 
       {/* Voice Browser Modal */}
