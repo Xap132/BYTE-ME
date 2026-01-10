@@ -1,26 +1,27 @@
-import { audioManager } from '@/services/audioManager';
+import { useTheme } from '@/contexts/ThemeContext';
 import { storageService } from '@/services/storageService';
 import { ttsService } from '@/services/ttsService';
 import { Check, ChevronRight, Play, Trash2, Volume2, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
-  const [darkMode, setDarkMode] = useState(false);
-  
+  const { theme, isDarkMode, toggleTheme } = useTheme();
+  const [darkMode, setDarkMode] = useState(isDarkMode);
+
   // Voice browser state
   const [showVoiceModal, setShowVoiceModal] = useState(false);
   const [voiceData, setVoiceData] = useState(null);
@@ -34,25 +35,13 @@ export default function SettingsScreen() {
   });
 
   useEffect(() => {
-    loadSettings();
-  }, []);
-
-  const loadSettings = async () => {
-    try {
-      const prefs = await storageService.loadPreferences();
-      if (prefs.darkMode !== undefined) setDarkMode(prefs.darkMode);
-    } catch (error) {
-      console.error('Error loading settings:', error);
-    }
-  };
+    setDarkMode(isDarkMode);
+  }, [isDarkMode]);
 
   const handleToggle = async (key, value, setter) => {
     setter(value);
-    try {
-      const prefs = await storageService.loadPreferences();
-      await storageService.savePreferences({ ...prefs, [key]: value });
-    } catch (error) {
-      console.error('Error saving setting:', error);
+    if (key === 'darkMode') {
+      await toggleTheme(value);
     }
   };
 
@@ -95,12 +84,40 @@ export default function SettingsScreen() {
     setExpandedLang(expandedLang === langCode ? null : langCode);
   };
 
+  const handleClearData = () => {
+    Alert.alert(
+      'Clear All Data',
+      'This will reset all your preferences, saved voices, and audio library. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await storageService.resetPreferences();
+              await storageService.clearAudioMetadata();
+              setSelectedVoices({ voiceUS: null, voiceUK: null, voiceFil: null });
+              Alert.alert('Done', 'All data has been cleared. Restart the app for changes to take full effect.');
+            } catch (error) {
+              console.error('Error clearing data:', error);
+              Alert.alert('Error', 'Failed to clear data');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Generate dynamic styles
+  const styles = getStyles(theme, isDarkMode);
+
   const renderVoiceItem = (voice, langKey) => {
     const isSelected = selectedVoices[langKey] === voice.id;
-    
+
     return (
-      <TouchableOpacity 
-        key={voice.id} 
+      <TouchableOpacity
+        key={voice.id}
         style={[styles.voiceItem, isSelected && styles.voiceItemSelected]}
         onPress={() => handleSelectVoice(langKey, voice.id)}
       >
@@ -112,13 +129,13 @@ export default function SettingsScreen() {
             {isSelected && <Check size={16} color="#2563EB" style={{ marginLeft: 8 }} />}
           </View>
           <Text style={styles.voiceDetails}>
-            {voice.quality ? `${voice.quality} quality` : 'Voice'} 
+            {voice.quality ? `${voice.quality} quality` : 'Voice'}
           </Text>
           {voice.technicalName && (
             <Text style={styles.voiceId} numberOfLines={1}>{voice.technicalName}</Text>
           )}
         </View>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.testButton}
           onPress={(e) => {
             e.stopPropagation();
@@ -139,17 +156,17 @@ export default function SettingsScreen() {
   const renderLanguageGroup = ({ item }) => {
     const currentVoice = selectedVoices[item.langKey];
     // Default to "Voice A" (first voice) when no specific voice is selected
-    const selectedVoiceName = currentVoice 
-      ? item.voices.find(v => v.id === currentVoice)?.displayName || 
-        item.voices.find(v => v.id === currentVoice)?.name || 
-        'Selected'
+    const selectedVoiceName = currentVoice
+      ? item.voices.find(v => v.id === currentVoice)?.displayName ||
+      item.voices.find(v => v.id === currentVoice)?.name ||
+      'Selected'
       : item.voices[0]?.displayName || 'Voice A';
-    
+
     const isExpanded = expandedLang === item.langCode;
-    
+
     return (
       <View style={[styles.langGroup, isExpanded && styles.langGroupExpanded]}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.langHeader}
           onPress={() => toggleLanguage(item.langCode)}
         >
@@ -162,13 +179,13 @@ export default function SettingsScreen() {
               {item.count} voice{item.count !== 1 ? 's' : ''} • Using: {selectedVoiceName}
             </Text>
           </View>
-          <ChevronRight 
-            size={20} 
-            color="#9CA3AF" 
+          <ChevronRight
+            size={20}
+            color="#9CA3AF"
             style={{ transform: [{ rotate: isExpanded ? '90deg' : '0deg' }] }}
           />
         </TouchableOpacity>
-        
+
         {isExpanded && (
           <View style={styles.voiceList}>
             {item.voices.map(voice => renderVoiceItem(voice, item.langKey))}
@@ -185,8 +202,8 @@ export default function SettingsScreen() {
         <Text style={styles.title}>Settings</Text>
       </View>
 
-      <ScrollView 
-        style={styles.scrollView} 
+      <ScrollView
+        style={styles.scrollView}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 }]}
         showsVerticalScrollIndicator={false}
       >
@@ -220,6 +237,24 @@ export default function SettingsScreen() {
             </View>
             <ChevronRight size={20} color="#9CA3AF" />
           </TouchableOpacity>
+
+        </View>
+
+        {/* Data Section */}
+        <Text style={styles.sectionLabel}>DATA</Text>
+        <View style={styles.section}>
+          <TouchableOpacity style={styles.actionItem} onPress={handleClearData}>
+            <View style={styles.actionLeft}>
+              <View style={[styles.actionIconContainer, { backgroundColor: '#FEE2E2' }]}>
+                <Trash2 size={18} color="#DC2626" />
+              </View>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingTitle}>Clear All Data</Text>
+                <Text style={styles.settingDesc}>Reset preferences and saved audio</Text>
+              </View>
+            </View>
+            <ChevronRight size={20} color="#9CA3AF" />
+          </TouchableOpacity>
         </View>
 
         {/* TTS Info Section */}
@@ -245,13 +280,13 @@ export default function SettingsScreen() {
           <View style={styles.aboutItem}>
             <Text style={styles.aboutLabel}>Developer</Text>
 
-            <Text style={styles.aboutValue}>BYTE-ME GROUP</Text>
+            <Text style={styles.aboutValue}>BYTE-ME</Text>
           </View>
         </View>
 
         {/* Footer */}
-        <Text style={styles.footer}>BSCS 3-1 for DCIT 26 - BYTE-ME</Text>
-          <Text style={styles.footer}>MARVELOUS GONZALES{"\n"}LYZETTE DOMINUGES{"\n"}HONEY GRAVE AQUINO</Text>
+        <Text style={styles.footer}>BSCS 3-1 for DCIT 26 - Tech Talk</Text>
+        <Text style={styles.footer}>MARVELOUS GONZALES{"\n"}LYZETTE DOMINUGES{"\n"}HONEY GRAVE AQUINO</Text>
       </ScrollView>
 
       {/* Voice Browser Modal */}
@@ -264,14 +299,14 @@ export default function SettingsScreen() {
         <View style={[styles.modalContainer, { paddingTop: insets.top }]}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Voice Library</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.closeButton}
               onPress={() => setShowVoiceModal(false)}
             >
-              <X size={24} color="#1F2937" />
+              <X size={24} color={theme.text} />
             </TouchableOpacity>
           </View>
-          
+
           {loadingVoices ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#2563EB" />
@@ -306,21 +341,20 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme, isDarkMode) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: theme.background,
   },
   header: {
     paddingTop: 16,
     paddingHorizontal: 20,
     paddingBottom: 20,
-    backgroundColor: '#FFFFFF',
   },
   title: {
     fontSize: 28,
     fontFamily: 'SF-Pro-Bold',
-    color: '#1F2937',
+    color: theme.text,
   },
   scrollView: {
     flex: 1,
@@ -332,13 +366,13 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 12,
     fontFamily: 'SF-Pro-Medium',
-    color: '#6B7280',
+    color: theme.textSecondary,
     letterSpacing: 0.5,
     marginBottom: 12,
     marginLeft: 4,
   },
   section: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.tabBarBg,
     borderRadius: 16,
     marginBottom: 24,
     overflow: 'hidden',
@@ -357,20 +391,20 @@ const styles = StyleSheet.create({
   settingTitle: {
     fontSize: 16,
     fontFamily: 'SF-Pro-Medium',
-    color: '#1F2937',
+    color: theme.text,
     marginBottom: 4,
   },
   settingDesc: {
     fontSize: 13,
     fontFamily: 'SF-Pro-Regular',
-    color: '#9CA3AF',
+    color: theme.textSecondary,
   },
   dangerText: {
-    color: '#DC2626',
+    color: '#EF4444',
   },
   divider: {
     height: 1,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#374151',
     marginLeft: 16,
   },
   actionItem: {
@@ -389,7 +423,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 8,
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#374151',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -404,24 +438,23 @@ const styles = StyleSheet.create({
   aboutLabel: {
     fontSize: 16,
     fontFamily: 'SF-Pro-Regular',
-    color: '#6B7280',
+    color: theme.textSecondary,
   },
   aboutValue: {
     fontSize: 16,
     fontFamily: 'SF-Pro-Medium',
-    color: '#1F2937',
+    color: theme.text,
   },
   footer: {
     fontSize: 13,
     fontFamily: 'SF-Pro-Regular',
-    color: '#9CA3AF',
+    color: '#6B7280',
     textAlign: 'center',
     marginTop: 12,
   },
-  // Modal styles
   modalContainer: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: theme.background,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -429,20 +462,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.tabBarBg,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: theme.borderColor || '#374151',
   },
   modalTitle: {
     fontSize: 20,
     fontFamily: 'SF-Pro-Bold',
-    color: '#1F2937',
+    color: theme.text,
   },
   closeButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: isDarkMode ? '#374151' : '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -455,17 +488,17 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 16,
     fontFamily: 'SF-Pro-Regular',
-    color: '#6B7280',
+    color: '#9CA3AF',
   },
   voiceSummary: {
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.tabBarBg,
   },
   summaryText: {
     fontSize: 15,
     fontFamily: 'SF-Pro-Medium',
-    color: '#1F2937',
+    color: theme.text,
   },
   summaryHint: {
     fontSize: 13,
@@ -479,15 +512,15 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   langGroup: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    backgroundColor: theme.tabBarBg,
+    borderRadius: 16,
     marginBottom: 12,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: theme.borderColor || '#374151',
   },
   langGroupExpanded: {
-    borderColor: '#2563EB',
+    borderColor: theme.orangeBtn,
     borderWidth: 2,
   },
   langHeader: {
@@ -495,7 +528,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 16,
   },
   langInfo: {
     flex: 1,
@@ -511,7 +544,7 @@ const styles = StyleSheet.create({
   langName: {
     fontSize: 16,
     fontFamily: 'SF-Pro-Medium',
-    color: '#1F2937',
+    color: theme.text,
   },
   langCount: {
     fontSize: 13,
@@ -521,18 +554,17 @@ const styles = StyleSheet.create({
   },
   voiceList: {
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    borderTopColor: '#374151',
+    paddingBottom: 8,
   },
   voiceItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
   },
   voiceItemSelected: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: 'rgba(205, 133, 70, 0.1)',
   },
   voiceInfo: {
     flex: 1,
@@ -545,28 +577,28 @@ const styles = StyleSheet.create({
   voiceName: {
     fontSize: 14,
     fontFamily: 'SF-Pro-Medium',
-    color: '#1F2937',
+    color: theme.text,
   },
   voiceNameSelected: {
-    color: '#2563EB',
+    color: theme.orangeBtn,
   },
   voiceDetails: {
     fontSize: 12,
     fontFamily: 'SF-Pro-Regular',
-    color: '#6B7280',
+    color: '#9CA3AF',
     marginTop: 2,
   },
   voiceId: {
     fontSize: 10,
     fontFamily: 'SF-Pro-Regular',
-    color: '#9CA3AF',
+    color: '#6B7280',
     marginTop: 2,
   },
   testButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#374151',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -577,7 +609,7 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: 14,
     fontFamily: 'SF-Pro-Regular',
-    color: '#6B7280',
+    color: '#9CA3AF',
     lineHeight: 20,
   },
 });

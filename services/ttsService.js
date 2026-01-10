@@ -25,8 +25,8 @@ const LANG_CONFIG = {
 // Priority languages (always show first if available)
 const PRIORITY_LANGUAGES = ['en-US', 'en-GB', 'fil-PH', 'fil', 'tl-PH', 'tl'];
 
-// Blacklist of languages to exclude from available voices
-const BLACKLISTED_LANGUAGES = ['en-IN'];
+// Blacklist of languages to exclude from available voices (empty for now)
+const BLACKLISTED_LANGUAGES = [];
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -382,6 +382,7 @@ class TTSService {
 
   /**
    * Get user's selected voice for a language, or use first available (Voice A)
+   * Also saves the default voice if none was previously selected
    */
   async _getVoiceForLanguage(langCode, prefKey) {
     try {
@@ -391,8 +392,16 @@ class TTSService {
       // Get all available voices first
       const voices = await Speech.getAvailableVoicesAsync();
       
+      // Helper to check if voice identifier is valid
+      const isValidVoiceId = (id) => {
+        if (!id || typeof id !== 'string') return false;
+        // Filter out malformed identifiers that end with -language, -voice, etc.
+        if (id.endsWith('-language') || id.endsWith('-voice')) return false;
+        return true;
+      };
+      
       // If user has a saved voice, validate it exists in available voices
-      if (userVoice) {
+      if (userVoice && isValidVoiceId(userVoice)) {
         const voiceExists = voices.some(v => v.identifier === userVoice);
         if (voiceExists) {
           console.log(`[TTS] Using user-selected voice: ${userVoice} for ${langCode}`);
@@ -402,15 +411,17 @@ class TTSService {
         }
       }
       
-      // Find voices matching this language
+      // Find voices matching this language (only with valid identifiers)
       // Try exact match first, then base language match
-      let matchingVoices = voices.filter(v => v.language === langCode);
+      let matchingVoices = voices.filter(v => 
+        v.language === langCode && isValidVoiceId(v.identifier)
+      );
       
       // If no exact match, try base language (e.g., 'en' for 'en-US')
       if (matchingVoices.length === 0) {
         const baseCode = langCode.split('-')[0];
         matchingVoices = voices.filter(v => 
-          v.language && v.language.startsWith(baseCode + '-')
+          v.language && v.language.startsWith(baseCode + '-') && isValidVoiceId(v.identifier)
         );
       }
       
@@ -423,11 +434,24 @@ class TTSService {
       const firstVoice = matchingVoices[0];
       if (firstVoice && firstVoice.identifier) {
         console.log(`[TTS] Using default Voice A: ${firstVoice.identifier} for ${langCode}`);
+        
+        // Auto-save this as the default voice for this language so it's used next time
+        try {
+          const currentPrefs = await storageService.loadPreferences();
+          if (!currentPrefs[prefKey]) {
+            currentPrefs[prefKey] = firstVoice.identifier;
+            await storageService.savePreferences(currentPrefs);
+            console.log(`[TTS] Auto-saved default voice: ${prefKey} = ${firstVoice.identifier}`);
+          }
+        } catch (saveErr) {
+          console.warn('[TTS] Could not auto-save voice preference:', saveErr);
+        }
+        
         return firstVoice.identifier;
       }
       
       // No voice found for this language - let system use default
-      console.log(`[TTS] No voice found for ${langCode}, using system default`);
+      console.log(`[TTS] No valid voice found for ${langCode}, using system default`);
       return null;
     } catch (err) {
       console.warn('[TTS] Error getting voice:', err);
@@ -465,7 +489,8 @@ class TTSService {
     } else if (language.startsWith('lang_')) {
       // Dynamic language ID (e.g., 'lang_es_ES' -> 'es-ES')
       langCode = language.replace('lang_', '').replace(/_/g, '-');
-      prefKey = `voice_${langCode}`;
+      // Use underscores in prefKey to match what's saved in getAvailableVoices
+      prefKey = `voice_${langCode.replace(/[^a-zA-Z0-9]/g, '_')}`;
     } else {
       // Fallback to US English
       langCode = 'en-US';
@@ -607,8 +632,21 @@ class TTSService {
     try {
       const voices = await Speech.getAvailableVoicesAsync();
       
-      // Filter out blacklisted languages
-      const filteredVoices = voices.filter(voice => !BLACKLISTED_LANGUAGES.includes(voice.language));
+      // Filter out blacklisted languages AND voices with malformed identifiers
+      // Some devices return identifiers like "en-IN-language" which are invalid
+      const filteredVoices = voices.filter(voice => {
+        // Skip blacklisted languages
+        if (BLACKLISTED_LANGUAGES.includes(voice.language)) return false;
+        
+        // Skip voices with malformed identifiers (ending in -language, -voice, etc.)
+        const id = voice.identifier || '';
+        if (id.endsWith('-language') || id.endsWith('-voice') || id.endsWith('-network-language')) {
+          console.log(`[TTS] Filtering out malformed voice: ${id}`);
+          return false;
+        }
+        
+        return true;
+      });
       
       // Group voices by language
       const languageGroups = {};
@@ -633,10 +671,11 @@ class TTSService {
           };
         }
         
+        // FIX: Use identifier (id) not language property for voice ID
         languageGroups[lang].voices.push({
-          id: id,
+          id: id,  // This is the actual voice identifier
           name: voice.name || id,
-          language: lang,
+          language: lang,  // This is just the language code, NOT the voice ID
           quality: voice.quality || '',
         });
       });
@@ -743,6 +782,12 @@ class TTSService {
    */
   async setVoicePreference(langKey, voiceId) {
     try {
+      // Validate the voice ID before saving
+      if (!voiceId || voiceId.endsWith('-language') || voiceId.endsWith('-voice')) {
+        console.warn(`[TTS] Not saving invalid voice ID: ${voiceId}`);
+        return false;
+      }
+      
       const prefs = await storageService.loadPreferences();
       prefs[langKey] = voiceId;
       await storageService.savePreferences(prefs);

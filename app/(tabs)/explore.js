@@ -1,3 +1,4 @@
+import { useTheme } from '@/contexts/ThemeContext';
 import { audioManager } from '@/services/audioManager';
 import { ttsService } from '@/services/ttsService';
 import Slider from '@react-native-community/slider';
@@ -18,9 +19,11 @@ import {
   View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { TAB_BAR_HEIGHT } from './_layout';
 
 export default function AudioLibraryScreen() {
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
   const [audioFiles, setAudioFiles] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [playingId, setPlayingId] = useState(null);
@@ -28,7 +31,7 @@ export default function AudioLibraryScreen() {
   const [currentPlaying, setCurrentPlaying] = useState(null);
   const [progress, setProgress] = useState(0);
   const [showOptions, setShowOptions] = useState(null);
-  
+
   // Progress tracking
   const progressTimerRef = useRef(null);
   const startTimeRef = useRef(0);
@@ -71,14 +74,14 @@ export default function AudioLibraryScreen() {
     totalDurationRef.current = calculateDuration(audioFile.text, speed);
     const elapsedTime = fromProgress * totalDurationRef.current;
     startTimeRef.current = Date.now() - elapsedTime;
-    
+
     if (progressTimerRef.current) clearInterval(progressTimerRef.current);
-    
+
     progressTimerRef.current = setInterval(() => {
       const elapsed = Date.now() - startTimeRef.current;
       const newProgress = Math.min(elapsed / totalDurationRef.current, 1);
       setProgress(newProgress);
-      
+
       if (newProgress >= 1) {
         handlePlaybackFinished();
       }
@@ -132,7 +135,7 @@ export default function AudioLibraryScreen() {
       setIsPaused(false);
       setProgress(0);
       pausedProgressRef.current = 0;
-      
+
       const language = audioFile.language ?? audioFile.settings?.language ?? 'en_us_f';
       const pitch = audioFile.pitch ?? audioFile.settings?.pitch ?? 1.0;
       const speed = audioFile.speed ?? audioFile.settings?.speed ?? 1.0;
@@ -146,7 +149,7 @@ export default function AudioLibraryScreen() {
         pitch,
         speed,
       });
-      
+
       // Finished naturally
       handlePlaybackFinished();
     } catch (error) {
@@ -197,13 +200,13 @@ export default function AudioLibraryScreen() {
     try {
       const filename = `${audioFile.name.replace(/\.[^.]+$/, '')}.wav`;
       const fileUri = `${FileSystem.documentDirectory}${filename}`;
-      
+
       // Create a simple WAV file (metadata as fake audio)
       const content = `RIFF${String.fromCharCode(36, 0, 0, 0)}WAVEfmt ${String.fromCharCode(16, 0, 0, 0, 1, 0, 1, 0, 68, 172, 0, 0, 136, 88, 1, 0, 2, 0, 16, 0)}data${String.fromCharCode(0, 0, 0, 0)}`;
-      
+
       // Save as .wav file
       await FileSystem.writeAsStringAsync(fileUri, content, { encoding: 'base64' });
-      
+
       // Share the file
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(fileUri, {
@@ -241,7 +244,7 @@ export default function AudioLibraryScreen() {
 
     return (
       <View style={styles.listItemContainer}>
-        <Pressable 
+        <Pressable
           style={styles.listItem}
           onPress={() => handlePlay(item)}
         >
@@ -264,7 +267,7 @@ export default function AudioLibraryScreen() {
           </View>
           <View style={styles.itemRight}>
             <Text style={styles.itemDuration}>{formatDuration(item.text, speed)}</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.moreButton}
               onPress={() => setShowOptions(item)}
             >
@@ -275,6 +278,9 @@ export default function AudioLibraryScreen() {
       </View>
     );
   };
+
+  // Generate dynamic styles
+  const styles = getStyles(theme, insets);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -293,8 +299,8 @@ export default function AudioLibraryScreen() {
           audioFiles.length === 0 && styles.emptyList,
         ]}
         refreshControl={
-          <RefreshControl 
-            refreshing={refreshing} 
+          <RefreshControl
+            refreshing={refreshing}
             onRefresh={onRefresh}
             tintColor="#2563EB"
           />
@@ -315,64 +321,64 @@ export default function AudioLibraryScreen() {
 
       {/* Now Playing Bar with Slider */}
       {currentPlaying && (
-        <Pressable 
+        <Pressable
           style={styles.nowPlayingOverlay}
           onPress={() => {
             handleStop();
           }}
         >
-          <Pressable 
-            style={[styles.nowPlayingBar, { paddingBottom: insets.bottom + 70 }]}
+          <Pressable
+            style={[styles.nowPlayingBar, { paddingBottom: TAB_BAR_HEIGHT + insets.bottom + 10 }]}
             onPress={(e) => e.stopPropagation()}
           >
-          <View style={styles.nowPlayingHeader}>
-            <View style={styles.nowPlayingInfo}>
-              <Text style={styles.nowPlayingLabel}>NOW PLAYING</Text>
-              <Text style={styles.nowPlayingTitle} numberOfLines={1}>
-                {currentPlaying.name}
-              </Text>
+            <View style={styles.nowPlayingHeader}>
+              <View style={styles.nowPlayingInfo}>
+                <Text style={styles.nowPlayingLabel}>NOW PLAYING</Text>
+                <Text style={styles.nowPlayingTitle} numberOfLines={1}>
+                  {currentPlaying.name}
+                </Text>
+              </View>
+              <View style={styles.controlButtons}>
+                <Pressable
+                  style={styles.nowPlayingButton}
+                  onPress={() => handlePlay(currentPlaying)}
+                >
+                  {isPaused ? (
+                    <Play size={20} color="#1F2937" fill="#1F2937" />
+                  ) : (
+                    <Pause size={20} color="#1F2937" fill="#1F2937" />
+                  )}
+                </Pressable>
+                <Pressable
+                  style={styles.stopButton}
+                  onPress={handleStop}
+                >
+                  <Square size={16} color="#EF4444" fill="#EF4444" />
+                </Pressable>
+              </View>
             </View>
-            <View style={styles.controlButtons}>
-              <Pressable 
-                style={styles.nowPlayingButton}
-                onPress={() => handlePlay(currentPlaying)}
-              >
-                {isPaused ? (
-                  <Play size={20} color="#1F2937" fill="#1F2937" />
-                ) : (
-                  <Pause size={20} color="#1F2937" fill="#1F2937" />
-                )}
-              </Pressable>
-              <Pressable 
-                style={styles.stopButton}
-                onPress={handleStop}
-              >
-                <Square size={16} color="#EF4444" fill="#EF4444" />
-              </Pressable>
+
+            {/* Progress Slider */}
+            <View style={styles.sliderContainer}>
+              <Slider
+                style={styles.progressSlider}
+                minimumValue={0}
+                maximumValue={1}
+                value={progress}
+                onValueChange={handleSliderChange}
+                minimumTrackTintColor="#2563EB"
+                maximumTrackTintColor="#374151"
+                thumbTintColor="#FFFFFF"
+              />
+              <View style={styles.timeRow}>
+                <Text style={styles.timeText}>
+                  {formatTime(progress, calculateDuration(currentPlaying.text, currentPlaying.speed ?? 1.0))}
+                </Text>
+                <Text style={styles.timeText}>
+                  {formatDuration(currentPlaying.text, currentPlaying.speed ?? 1.0)}
+                </Text>
+              </View>
             </View>
-          </View>
-          
-          {/* Progress Slider */}
-          <View style={styles.sliderContainer}>
-            <Slider
-              style={styles.progressSlider}
-              minimumValue={0}
-              maximumValue={1}
-              value={progress}
-              onValueChange={handleSliderChange}
-              minimumTrackTintColor="#2563EB"
-              maximumTrackTintColor="#374151"
-              thumbTintColor="#FFFFFF"
-            />
-            <View style={styles.timeRow}>
-              <Text style={styles.timeText}>
-                {formatTime(progress, calculateDuration(currentPlaying.text, currentPlaying.speed ?? 1.0))}
-              </Text>
-              <Text style={styles.timeText}>
-                {formatDuration(currentPlaying.text, currentPlaying.speed ?? 1.0)}
-              </Text>
-            </View>
-          </View>
           </Pressable>
         </Pressable>
       )}
@@ -384,30 +390,30 @@ export default function AudioLibraryScreen() {
         animationType="fade"
         onRequestClose={() => setShowOptions(null)}
       >
-        <Pressable 
+        <Pressable
           style={styles.optionsOverlay}
           onPress={() => setShowOptions(null)}
         >
           <View style={styles.optionsContent}>
             <Text style={styles.optionsTitle}>{showOptions?.name}</Text>
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={styles.optionItem}
               onPress={() => handleSaveToDevice(showOptions)}
             >
-              <Download size={20} color="#1F2937" />
+              <Download size={20} color={theme.text} />
               <Text style={styles.optionText}>Download Audio</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={[styles.optionItem, styles.optionItemDanger]}
               onPress={() => handleDelete(showOptions)}
             >
               <Trash2 size={20} color="#DC2626" />
               <Text style={[styles.optionText, styles.optionTextDanger]}>Delete</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={styles.optionCancel}
               onPress={() => setShowOptions(null)}
             >
@@ -420,10 +426,10 @@ export default function AudioLibraryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme, insets) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.background,
   },
   header: {
     paddingTop: 16,
@@ -433,17 +439,17 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontFamily: 'SF-Pro-Bold',
-    color: '#1F2937',
+    color: theme.text,
   },
   listContent: {
     paddingHorizontal: 20,
-    paddingBottom: 200,
+    paddingBottom: TAB_BAR_HEIGHT + insets.bottom + 20,
   },
   emptyList: {
     flex: 1,
   },
   listItemContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'transparent',
   },
   listItem: {
     flexDirection: 'row',
@@ -460,13 +466,13 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: theme.tabBarBg,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
   },
   playIconActive: {
-    backgroundColor: '#2563EB',
+    backgroundColor: theme.orangeBtn,
   },
   itemInfo: {
     flex: 1,
@@ -474,13 +480,13 @@ const styles = StyleSheet.create({
   itemTitle: {
     fontSize: 16,
     fontFamily: 'SF-Pro-Medium',
-    color: '#1F2937',
+    color: theme.text,
     marginBottom: 4,
   },
   itemSubtitle: {
     fontSize: 14,
     fontFamily: 'SF-Pro-Regular',
-    color: '#9CA3AF',
+    color: theme.textSecondary,
   },
   itemRight: {
     flexDirection: 'row',
@@ -497,7 +503,7 @@ const styles = StyleSheet.create({
   },
   separator: {
     height: 1,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: theme.tabBarBg,
   },
   emptyState: {
     flex: 1,
@@ -509,7 +515,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: theme.tabBarBg,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
@@ -517,7 +523,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontFamily: 'SF-Pro-Medium',
-    color: '#1F2937',
+    color: theme.text,
     marginBottom: 8,
   },
   emptyText: {
@@ -527,22 +533,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 40,
   },
-  // Now Playing Bar
   nowPlayingOverlay: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
     top: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
   nowPlayingBar: {
-    backgroundColor: '#1F2937',
+    backgroundColor: theme.tabBarBg,
     paddingTop: 16,
     paddingHorizontal: 20,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
   },
   nowPlayingHeader: {
     flexDirection: 'row',
@@ -563,12 +568,12 @@ const styles = StyleSheet.create({
   nowPlayingTitle: {
     fontSize: 16,
     fontFamily: 'SF-Pro-Medium',
-    color: '#FFFFFF',
+    color: theme.text,
   },
   controlButtons: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
   },
   nowPlayingButton: {
     width: 48,
@@ -586,7 +591,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Slider
   sliderContainer: {
     marginBottom: 8,
   },
@@ -604,46 +608,47 @@ const styles = StyleSheet.create({
     fontFamily: 'SF-Pro-Regular',
     color: '#9CA3AF',
   },
-  // Options Modal
   optionsOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
   optionsContent: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
+    backgroundColor: theme.background,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    padding: 24,
     paddingBottom: 40,
+    borderTopWidth: 1,
+    borderTopColor: theme.divider || 'rgba(0,0,0,0.1)',
   },
   optionsTitle: {
     fontSize: 18,
     fontFamily: 'SF-Pro-Bold',
-    color: '#1F2937',
+    color: theme.text,
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   optionItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 16,
     paddingHorizontal: 16,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 12,
-    marginBottom: 8,
+    backgroundColor: theme.tabBarBg,
+    borderRadius: 16,
+    marginBottom: 12,
     gap: 12,
   },
   optionItemDanger: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
   },
   optionText: {
     fontSize: 16,
     fontFamily: 'SF-Pro-Medium',
-    color: '#1F2937',
+    color: theme.text,
   },
   optionTextDanger: {
-    color: '#DC2626',
+    color: '#EF4444',
   },
   optionCancel: {
     paddingVertical: 16,
@@ -653,6 +658,6 @@ const styles = StyleSheet.create({
   optionCancelText: {
     fontSize: 16,
     fontFamily: 'SF-Pro-Medium',
-    color: '#6B7280',
+    color: theme.textSecondary,
   },
 });
